@@ -68,3 +68,5 @@ if __name__ == '__main__':
     E_c = Encoder(2, 1)
     D = Encoder(2, 2)
     C = Discriminator(2)
+    for p in C.parameters():
+        print(p)
