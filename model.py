@@ -60,7 +60,6 @@ class D(nn.Module):
         out = self.dconv4(out)
         out = F.leaky_relu(out)
         out = self.fc(out).squeeze()
+        out = F.sigmoid(out)
         return out
-        
-        
 
