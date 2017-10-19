@@ -56,22 +56,22 @@ class DataLoader(object):
     def sample_utt(self, speaker_id):
         utt_ids = list(self.f_h5['train/{}'.format(speaker_id)].keys())
         # sample an utterence
-        utt_id = random.choice(utt_ids)
+        utt_id = random.sample(utt_ids, 1)[0]
         spec = self.f_h5['train/{}/{}'.format(speaker_id, utt_id)]
         return spec
         
     def sample(self):
         # sample two speakers
         #speakerA, speakerB = random.sample(self.speakers, 2)
-        speakerA = random.choice(self.female_ids)
-        speakerB = random.choice(self.male_ids)
+        speakerA = random.sample(self.female_ids, 1)[0]
+        speakerB = random.sample(self.male_ids)[0]
         specA = self.sample_utt(speakerA)
         # sample t and t^k 
         t = random.randint(0, specA.shape[0] - 2)
         t_k = random.randint(t, min(specA.shape[0] - 1, t + self.max_step))
         # sample a segment from speakerB
         specB = self.sample_utt(speakerB)
-        segB = random.choice(specB)
+        segB = random.sample(specB, 1)[0]
         return specA[t][0:1], specA[t_k][0:1], segB[0:1] 
 
     def next_batch(self):
