@@ -37,30 +37,37 @@ class Hps(object):
             json.dump(self._hps._asdict(), f_json, indent=4, separators=(',', ': '))
 
 class DataLoader(object):
-    def __init__(self, h5_path, max_step=5, batch_size=16):
+    def __init__(self, h5_path, speaker_sex_path, max_step=5, batch_size=16):
         self.f_h5 = h5py.File(h5_path, 'r')
         self.batch_size = batch_size
         self.max_step = max_step
-        self.speakers = list(self.f_h5['train'].keys())
+        self.read_sex_file(speaker_sex_path)
+
+    def read_sex_file(self, speaker_sex_path):
+        with open(speaker_sex_path, 'r') as f:
+            # Female
+            f.readline()
+            self.female_ids = f.readline().strip().split()
+            # Male
+            f.readline()
+            self.male_ids = f.readline().strip().split()
 
     def sample_utt(self, speaker_id):
         utt_ids = list(self.f_h5['train/{}'.format(speaker_id)].keys())
         # sample an utterence
         utt_id = random.choice(utt_ids)
-        print('speaker:{}, utterence:{}'.format(speaker_id, utt_id))
         spec = self.f_h5['train/{}/{}'.format(speaker_id, utt_id)]
         return spec
         
     def sample(self):
-        # sample a datapoint
         # sample two speakers
-        speakerA, speakerB = random.sample(self.speakers, 2)
-        print('speaker: {}, {}'.format(speakerA, speakerB))
+        #speakerA, speakerB = random.sample(self.speakers, 2)
+        speakerA = random.sample(self.female_ids, 1)
+        speakerB = random.sample(self.male_ids, 1)
         specA = self.sample_utt(speakerA)
         # sample t and t^k 
         t = random.randint(0, specA.shape[0] - 2)
         t_k = random.randint(t, min(specA.shape[0] - 1, t + self.max_step))
-        print('t:{}, t_k:{}'.format(t, t_k))
         # sample a segment from speakerB
         specB = self.sample_utt(speakerB)
         segB = random.choice(specB)
