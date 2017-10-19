@@ -42,6 +42,7 @@ class DataLoader(object):
         self.batch_size = batch_size
         self.max_step = max_step
         self.read_sex_file(speaker_sex_path)
+        self.speakers = list(self.f_h5['train'].keys())
 
     def read_sex_file(self, speaker_sex_path):
         with open(speaker_sex_path, 'r') as f:
@@ -62,8 +63,8 @@ class DataLoader(object):
     def sample(self):
         # sample two speakers
         #speakerA, speakerB = random.sample(self.speakers, 2)
-        speakerA = random.sample(self.female_ids, 1)
-        speakerB = random.sample(self.male_ids, 1)
+        speakerA = random.choice(self.female_ids)
+        speakerB = random.choice(self.male_ids)
         specA = self.sample_utt(speakerA)
         # sample t and t^k 
         t = random.randint(0, specA.shape[0] - 2)
@@ -71,7 +72,7 @@ class DataLoader(object):
         # sample a segment from speakerB
         specB = self.sample_utt(speakerB)
         segB = random.choice(specB)
-        return specA[t], specA[t_k], segB 
+        return specA[t][0:1], specA[t_k][0:1], segB[0:1] 
 
     def next_batch(self):
         all_X = [[], [], []]
@@ -82,8 +83,13 @@ class DataLoader(object):
 
 
 if __name__ == '__main__':
-    #hps = Hps()
-    #hps.dump('./hps/v1.json')
-    data_loader = DataLoader('/storage/raw_feature/voice_conversion/libre_equal.h5')
-    _ = data_loader.next_batch()
+    hps = Hps()
+    hps.dump('./hps/v1.json')
+    #data_loader = DataLoader(
+    #    '/storage/raw_feature/voice_conversion/libre_equal.h5',
+    #    '/storage/raw_feature/voice_conversion/train-clean-100-speaker-sex.txt',
+    #)
+    #for i in range(100):
+    #    print(i)
+    #    _ = data_loader.next_batch()
 
