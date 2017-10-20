@@ -9,6 +9,7 @@ import math
 import argparse
 import random
 import time
+import tensorflow as tf
 
 class Hps(object):
     def __init__(self):
@@ -93,19 +94,29 @@ class DataLoader(object):
         np.array(X_i_tk, dtype=np.float32), \
         np.array(X_j, dtype=np.float32)
 
+class Logger(object):
+    def __init__(self, log_dir='./log'):
+        self.writer = tf.summary.FileWriter(log_dir)
 
+    def scalar_summary(self, tag, value, step):
+        summary = tf.Summary(value=[tf.Summary.Value(tag=tag, simple_value=value)])
+        self.writer.add_summary(summary, step)
 
 if __name__ == '__main__':
     #hps = Hps()
     #hps.dump('./hps/v1.json')
-    data_loader = DataLoader(
-        '/storage/raw_feature/voice_conversion/libre_equal.h5',
-        '/storage/raw_feature/voice_conversion/train-clean-100-speaker-sex.txt',
-    )
-    st = time.time()
+    #data_loader = DataLoader(
+    #    '/storage/raw_feature/voice_conversion/libre_equal.h5',
+    #    '/storage/raw_feature/voice_conversion/train-clean-100-speaker-sex.txt',
+    #)
+    #st = time.time()
+    #for i in range(100):
+    #    print(i)
+    #    batch = next(data_loader)
+    #et = time.time()
+    #print(et - st)
+    logger = Logger()
     for i in range(100):
-        print(i)
-        batch = next(data_loader)
-    et = time.time()
-    print(et - st)
+        logger.scalar_summary('loss', np.random.randn(), i + 1)
+
 
