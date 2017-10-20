@@ -2,6 +2,7 @@ import torch
 from torch import optim
 from torch.autograd import Variable
 import numpy as np
+import pickle
 from model import Encoder
 from model import Discriminator
 from utils import Hps
@@ -20,6 +21,8 @@ class Solver(object):
         self.C_opt = None
         self.build_model()
         self.logger = Logger(log_dir)
+        self.model_kept = []
+        self.max_keep = 10
 
     def build_model(self):
         self.Encoder_s = Encoder(1, 1)
@@ -38,13 +41,28 @@ class Solver(object):
         self.C_opt = optim.Adam(self.Discriminator.parameters(), lr=self.hps.lr)
 
     def to_var(self, x):
-        x = Variable(torch.from_numpy(x))
+        x = Variable(torch.from_numpy(x), requires_grad=True)
         if torch.cuda.is_available():
            return x.cuda()
         else:
             return x
 
-    def train(self):
+    def save_model(self, model_path, iteration):
+        Es_path = os.path.join(model_path, 'Es-{}.pkl'.format(iteration))
+        Ec_path = os.path.join(model_path, 'Ec-{}.pkl'.format(iteration))
+        Dec_path = os.path.join(model_path, 'Dec-{}.pkl'.format(iteration))
+        Dis_path = os.path.join(model_path, 'Dis-{}.pkl'.format(iteration))
+        torch.save(self.Encoder_s.state_dict(), Es_path)
+        torch.save(self.Encoder_c.state_dict(), Ec_path)
+        torch.save(self.Decoder.state_dict(), Dec_path)
+        torch.save(self.Discriminator.state_dict(), Dis_path)
+        self.model_kept.append([Es_path, Ec_path, Dec_path, Dis_path])
+        if len(self.model_kept) >= self.max_keep:
+            for model_path in self.model_kept[0]:
+                os.remove(model_path)
+            self.model_kept.pop(0)
+
+    def train(self, model_path):
         for iteration in range(self.hps.iterations):
             print(iteration)
             X_i_t, X_i_tk, X_j = [self.to_var(x) for x in next(self.data_loader)]
@@ -97,7 +115,9 @@ class Solver(object):
                 L_adv_E.data[0]
             }
             print(
-                'iteration:[%06d/%06d], L_rec=%.2f, L_sim=%.2f, L_adv_C=%.2f, L_adv_E=%.2f\r' % slot_value,
+                'iteration:[%06d/%06d], L_rec=%.2f, L_sim=%.2f,'
+                'L_adv_C=%.2f, L_adv_E=%.2f\r' 
+                % slot_value,
                 end=''
             )
             info = {
@@ -109,6 +129,8 @@ class Solver(object):
             for tag, value in info.items():
                 self.logger.scalar_summary(tag, value, iteration + 1)
 
+            if iteration % 100 == 0:
+                self.save_model(model_path, iteration)
 
 if __name__ == '__main__':
     hps = Hps()
