@@ -68,8 +68,10 @@ class DataLoader(object):
     def sample(self):
         # sample two speakers
         #speakerA, speakerB = random.sample(self.speakers, 2)
-        speakerA = self.rand(self.female_ids)
-        speakerB = self.rand(self.male_ids)
+        #speakerA = self.rand(self.female_ids)
+        #speakerB = self.rand(self.male_ids)
+        speakerA = self.female_ids[0]
+        speakerB = self.male_ids[0]
         specA = self.sample_utt(speakerA)
         # sample t and t^k 
         t = random.randint(0, specA.shape[0] - 2)
