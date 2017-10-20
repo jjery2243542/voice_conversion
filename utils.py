@@ -83,11 +83,14 @@ class DataLoader(object):
         return self
 
     def __next__(self):
-        all_X = [[], [], []]
+        X_i_t, X_i_tk, X_j = [], [], []
         for _ in range(self.batch_size):
-            for X, x in zip(all_X, self.sample()):
+            for X, x in zip([X_i_t, X_i_tk, X_j], self.sample()):
                 X.append(x) 
-        return [np.array(X, dtype=np.float32) for X in all_X]
+        return np.array(X_i_t, dtype=np.float32), \
+        np.array(X_i_tk, dtype=np.float32), \
+        np.array(X_j, dtype=np.float32)
+
 
 
 if __name__ == '__main__':
