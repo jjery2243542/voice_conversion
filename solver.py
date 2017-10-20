@@ -6,9 +6,10 @@ from model import Encoder
 from model import Discriminator
 from utils import Hps
 from utils import DataLoader
+from utils import Logger
 
 class Solver(object):
-    def __init__(self, hps, data_loader):
+    def __init__(self, hps, data_loader, log_dir='./log/'):
         self.hps = hps
         self.data_loader = data_loader
         self.Encoder_s = None
@@ -18,6 +19,7 @@ class Solver(object):
         self.G_opt = None
         self.C_opt = None
         self.build_model()
+        self.logger = Logger(log_dir)
 
     def build_model(self):
         self.Encoder_s = Encoder(1, 1)
@@ -85,6 +87,28 @@ class Solver(object):
                 self.hps.max_grad_norm
             )
             self.g_opt.step()
+            # print info
+            slot_value = {
+                iteration,
+                self.hps.iterations,
+                L_rec.data[0],
+                L_sim.data[0],
+                L_adv_C.data[0],
+                L_adv_E.data[0]
+            }
+            print(
+                'iteration:[%06d/%06d], L_rec=%.2f, L_sim=%.2f, L_adv_C=%.2f, L_adv_E=%.2f\r' % slot_value,
+                end=''
+            )
+            info = {
+                'L_rec':L_rec.data[0],
+                'L_sim':L_sim.data[0],
+                'L_adv_C':L_adv_C.data[0],
+                'L_adv_E':L_adv_E.data[0],
+            }
+            for tag, value in info.items():
+                self.logger.scalar_summary(tag, value, iteration + 1)
+
 
 if __name__ == '__main__':
     hps = Hps()
@@ -95,7 +119,5 @@ if __name__ == '__main__':
         '/storage/raw_feature/voice_conversion/train-clean-100-speaker-sex.txt'
     )
     solver = Solver(hps_tuple, data_loader)
-    while True:
-        1 +1 
-    #solver.train()
+    solver.train()
 
