@@ -10,6 +10,7 @@ import argparse
 import random
 import time
 import tensorflow as tf
+from torch.utils import data
 
 class Hps(object):
     def __init__(self):
@@ -38,9 +39,8 @@ class Hps(object):
             json.dump(self._hps._asdict(), f_json, indent=4, separators=(',', ': '))
 
 class Sampler(object):
-    def __init__(self, h5_path, speaker_sex_path, max_step=5, batch_size=16):
+    def __init__(self, h5_path, speaker_sex_path, max_step=5):
         self.f_h5 = h5py.File(h5_path, 'r')
-        self.batch_size = batch_size
         self.max_step = max_step
         self.read_sex_file(speaker_sex_path)
         self.speakers = list(self.f_h5['train'].keys())
@@ -80,6 +80,22 @@ class Sampler(object):
         specB = self.sample_utt(speakerB)
         j = random.randint(0, specB.shape[0] - 1)
         return specA[t][0:1], specA[t_k][0:1], specB[j][0:1] 
+
+class DataLoader(object):
+    def __init__(self, h5py_path):
+        self.f_h5 = h5py.File(h5py_path)
+        self.keys = list(self.f_h5.keys())
+        self.index = 0
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self.index >= len(self.keys):
+            self.index = 0
+        return self.f_h5['{}/X_i_t'.format(self.index)],\
+            self.f_h5['{}/X_i_tk'.format(self.index)],\
+            self.f_h5['{}/X_j'.format(self.index)]
 
 class Logger(object):
     def __init__(self, log_dir='./log'):
