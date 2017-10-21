@@ -10,7 +10,6 @@ import argparse
 import random
 import time
 import tensorflow as tf
-from torch.utils import data
 
 class Hps(object):
     def __init__(self):
@@ -20,10 +19,11 @@ class Hps(object):
             'beta',
             'max_step',
             'batch_size',
+            'pretrain_iterations',
             'iterations',
             ]
         )
-        default = [2e-3, 1, 1e-4, 5, 16, 100000]
+        default = [2e-3, 1, 1e-4, 5, 16, 2000, 100000]
         self._hps = self.hps._make(default)
 
     def get_tuple(self):
@@ -93,9 +93,9 @@ class DataLoader(object):
     def __next__(self):
         if self.index >= len(self.keys):
             self.index = 0
-        return self.f_h5['{}/X_i_t'.format(self.index)],\
-            self.f_h5['{}/X_i_tk'.format(self.index)],\
-            self.f_h5['{}/X_j'.format(self.index)]
+        return self.f_h5['{}/X_i_t'.format(self.index)][()],\
+            self.f_h5['{}/X_i_tk'.format(self.index)][()],\
+            self.f_h5['{}/X_j'.format(self.index)][()]
 
 class Logger(object):
     def __init__(self, log_dir='./log'):
@@ -106,12 +106,11 @@ class Logger(object):
         self.writer.add_summary(summary, step)
 
 if __name__ == '__main__':
-    hps = Hps()
-    hps.dump('./hps/v1.json')
-    #data_loader = DataLoader(
-    #    '/storage/raw_feature/voice_conversion/libre_equal.h5',
-    #    '/storage/raw_feature/voice_conversion/train-clean-100-speaker-sex.txt',
-    #)
+    #hps = Hps()
+    #hps.dump('./hps/v1.json')
+    data_loader = DataLoader('/storage/raw_feature/voice_conversion/two_speaker_16_5.h5')
+    for _ in range(10):
+        print(next(data_loader))
     #st = time.time()
     #for i in range(100):
     #    print(i)
