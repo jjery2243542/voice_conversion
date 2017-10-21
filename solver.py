@@ -1,6 +1,7 @@
 import torch
 from torch import optim
 from torch.autograd import Variable
+from torch import nn
 import numpy as np
 import pickle
 from model import Encoder
@@ -9,11 +10,6 @@ from utils import Hps
 from utils import DataLoader
 from utils import Logger
 import os 
-
-#def get_grad(net):
-#    for p in net.parameters():
-#       print(torch.sum(p.grad), p.size())
-#    return
 
 class Solver(object):
     def __init__(self, hps, data_loader, log_dir='./log/'):
@@ -56,18 +52,18 @@ class Solver(object):
             X_i_t, X_i_tk, X_j = [self.to_var(x) for x in next(self.data_loader)]
             D_same = self.Discriminator(X_i_t, X_i_tk)
             D_diff = self.Discriminator(X_i_t, X_j)
-            L = -torch.mean(torch.log(D_same) + torch.log(1 - D_diff))
+            loss = -torch.mean(torch.log(D_same) + torch.log(1 - D_diff))
             self.reset_grad()
-            L.backward()
+            loss.backward()
             self.D_opt.step()
             slot_value = (
                 iteration + 1,
                 self.hps.pretrain_iterations, 
-                L.data[0]
+                loss.data[0]
             )
             print('iteration: [%04d/%04d], loss: %.6f' % slot_value)
             info = {
-                'pretrain_loss':L.data[0],
+                'pretrain_loss': loss.data[0],
             }
             for tag, value in info.items():
                 self.logger.scalar_summary(tag, value, iteration + 1)
@@ -108,51 +104,51 @@ class Solver(object):
             # encode
             Ec_i_t, Ec_i_tk, Ec_j = self.Encoder_c(X_i_t), self.Encoder_c(X_i_tk), self.Encoder_c(X_j)
             # train discriminator
-            L_adv_C = -torch.mean(
+            loss_adv_dis = -torch.mean(
                 torch.log(self.Discriminator(Ec_i_t, Ec_i_tk)) +
                 torch.log(1 - self.Discriminator(Ec_i_t, Ec_j))
             )
             self.reset_grad()
-            (self.hps.beta * L_adv_C).backward()
+            (self.hps.beta * L_adv_dis).backward()
             self.D_opt.step()
             #===================== Train G =====================#
             # train encoder and decoder
             X_i_t, X_i_tk, X_j = [self.to_var(x) for x in next(self.data_loader)]
+            # encode
             Es_i_t = self.Encoder_s(X_i_t)
             Es_i_tk = self.Encoder_s(X_i_tk)
-            L_sim = torch.mean((Es_i_t - Es_i_tk) ** 2)
             Ec_i_tk = self.Encoder_c(X_i_tk)
+            loss_sim = torch.sum((Es_i_t - Es_i_tk) ** 2) / self.hps.batch_size
             E = torch.cat([Es_i_t, Ec_i_tk], dim=1)
             X_tilde = self.Decoder(E)
-            L_rec = torch.mean((X_tilde - X_i_tk) ** 2)
-            Ec_prob = self.Discriminator(Ec_i_tk, Ec_i_tk)
-            L_adv_E = -torch.mean(
-                0.5 * torch.log(Ec_prob) + 
-                0.5 * torch.log(1 - Ec_prob)
+            loss_rec = torch.sum((X_tilde - X_i_tk) ** 2) / self.hps.batch_size
+            loss_adv_enc = -torch.mean(
+                0.5 * torch.log(self.Discriminator(Ec_i_tk, Ec_i_tk)) + 
+                0.5 * torch.log(1 - self.Discriminator(Ec_i_tk, Ec_i_tk))
             )
-            L = L_rec + self.hps.alpha * L_sim + self.hps.beta * L_adv_E
+            loss = loss_rec + self.hps.alpha * loss_sim + self.hps.beta * loss_adv_enc
             self.reset_grad()
-            L.backward()
+            loss.backward()
             self.G_opt.step()
             # print info
             slot_value = (
                 iteration,
                 self.hps.iterations,
-                L_rec.data[0],
-                L_sim.data[0],
-                L_adv_C.data[0],
-                L_adv_E.data[0]
+                loss_rec.data[0],
+                loss_sim.data[0],
+                loss_adv_dis.data[0],
+                loss_adv_enc.data[0],
             )
             print(
-                'iteration:[%06d/%06d], L_rec=%.3f, L_sim=%.3f, '
-                'L_adv_C=%.3f, L_adv_E=%.3f\r' 
+                'iteration:[%06d/%06d], loss_rec=%.3f, loss_sim=%.3f, '
+                'loss_adv_dis=%.3f, loss_adv_enc=%.3f' 
                 % slot_value,
             )
             info = {
-                'L_rec':L_rec.data[0],
-                'L_sim':L_sim.data[0],
-                'L_adv_C':L_adv_C.data[0],
-                'L_adv_E':L_adv_E.data[0],
+                'loss_rec':loss_rec.data[0],
+                'loss_sim':loss_sim.data[0],
+                'loss_adv_dis':loss_adv_dis.data[0],
+                'loss_adv_enc':loss_adv_enc.data[0],
             }
             for tag, value in info.items():
                 self.logger.scalar_summary(tag, value, iteration + 1)
