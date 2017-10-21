@@ -38,9 +38,8 @@ class Hps(object):
             json.dump(self._hps._asdict(), f_json, indent=4, separators=(',', ': '))
 
 class Sampler(object):
-    def __init__(self, h5_path, speaker_sex_path, max_step=5, batch_size=16):
+    def __init__(self, h5_path, speaker_sex_path, max_step=5):
         self.f_h5 = h5py.File(h5_path, 'r')
-        self.batch_size = batch_size
         self.max_step = max_step
         self.read_sex_file(speaker_sex_path)
         self.speakers = list(self.f_h5['train'].keys())
