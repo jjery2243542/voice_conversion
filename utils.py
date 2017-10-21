@@ -18,12 +18,11 @@ class Hps(object):
             'alpha',
             'beta',
             'max_step',
-            'max_grad_norm',
             'batch_size',
             'iterations',
             ]
         )
-        default = [2e-3, 1, 1e-4, 5, 2, 32, 100000]
+        default = [2e-3, 1, 1e-4, 5, 16, 100000]
         self._hps = self.hps._make(default)
 
     def get_tuple(self):
@@ -38,7 +37,7 @@ class Hps(object):
         with open(path, 'w') as f_json:
             json.dump(self._hps._asdict(), f_json, indent=4, separators=(',', ': '))
 
-class DataLoader(object):
+class Sampler(object):
     def __init__(self, h5_path, speaker_sex_path, max_step=5, batch_size=16):
         self.f_h5 = h5py.File(h5_path, 'r')
         self.batch_size = batch_size
@@ -82,18 +81,6 @@ class DataLoader(object):
         j = random.randint(0, specB.shape[0] - 1)
         return specA[t][0:1], specA[t_k][0:1], specB[j][0:1] 
 
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        X_i_t, X_i_tk, X_j = [], [], []
-        for _ in range(self.batch_size):
-            for X, x in zip([X_i_t, X_i_tk, X_j], self.sample()):
-                X.append(x) 
-        return np.array(X_i_t, dtype=np.float32), \
-        np.array(X_i_tk, dtype=np.float32), \
-        np.array(X_j, dtype=np.float32)
-
 class Logger(object):
     def __init__(self, log_dir='./log'):
         self.writer = tf.summary.FileWriter(log_dir)
@@ -103,8 +90,8 @@ class Logger(object):
         self.writer.add_summary(summary, step)
 
 if __name__ == '__main__':
-    #hps = Hps()
-    #hps.dump('./hps/v1.json')
+    hps = Hps()
+    hps.dump('./hps/v1.json')
     #data_loader = DataLoader(
     #    '/storage/raw_feature/voice_conversion/libre_equal.h5',
     #    '/storage/raw_feature/voice_conversion/train-clean-100-speaker-sex.txt',
@@ -115,8 +102,8 @@ if __name__ == '__main__':
     #    batch = next(data_loader)
     #et = time.time()
     #print(et - st)
-    logger = Logger()
-    for i in range(100):
-        logger.scalar_summary('loss', np.random.randn(), i + 1)
+    #logger = Logger()
+    #for i in range(100):
+    #    logger.scalar_summary('loss', np.random.randn(), i + 1)
 
 
