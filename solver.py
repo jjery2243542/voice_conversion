@@ -118,10 +118,10 @@ class Solver(object):
             Es_i_t = self.Encoder_s(X_i_t)
             Es_i_tk = self.Encoder_s(X_i_tk)
             Ec_i_tk = self.Encoder_c(X_i_tk)
-            loss_sim = torch.sum((Es_i_t - Es_i_tk) ** 2) / self.hps.batch_size
+            loss_sim = torch.mean((Es_i_t - Es_i_tk) ** 2)
             E = torch.cat([Es_i_t, Ec_i_tk], dim=1)
             X_tilde = self.Decoder(E)
-            loss_rec = torch.sum((X_tilde - X_i_tk) ** 2) / self.hps.batch_size
+            loss_rec = torch.mean((X_tilde - X_i_tk) ** 2)
             loss_adv_enc = -torch.mean(
                 0.5 * torch.log(self.Discriminator(Ec_i_tk, Ec_i_tk)) + 
                 0.5 * torch.log(1 - self.Discriminator(Ec_i_tk, Ec_i_tk))
@@ -153,7 +153,7 @@ class Solver(object):
             for tag, value in info.items():
                 self.logger.scalar_summary(tag, value, iteration + 1)
 
-            if iteration % 1000 == 0:
+            if iteration % 100 == 0:
                 self.save_model(model_path, iteration)
 
 if __name__ == '__main__':
