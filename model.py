@@ -70,5 +70,4 @@ if __name__ == '__main__':
     e1 = E_s(d1)
     e2 = E_s(d2)
     f= C(e1, e2)
-    print(f)
    # print(C(d1, d2).size())

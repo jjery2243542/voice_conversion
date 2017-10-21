@@ -8,14 +8,22 @@ from model import Discriminator
 from utils import Hps
 from utils import DataLoader
 from utils import Logger
+from solver import Solver
+import argparse
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--pretrain', action='store_true')
+    parser.add_argument('--train', action='store_true')
+    args = parser.parse_args()
     hps = Hps()
     hps.load('./hps/v1.json')
     hps_tuple = hps.get_tuple()
     data_loader = DataLoader(
-        '/nfs/Mazu/jjery2243542/voice_conversion/datasets/libre_equal.h5',
-        '/nfs/Mazu/jjery2243542/voice_conversion/datasets/train-clean-100-speaker-sex.txt'
+        '/storage/raw_feature/voice_conversion/two_speaker_16_5.h5'
     )
     solver = Solver(hps_tuple, data_loader)
-    solver.train('/nfs/Mazu/jjery2243542/voice_conversion/model')
+    if args.pretrain:
+        solver.pretrain_discri('/storage/model/voice_conversion')
+    if args.train:
+        solver.train('/nfs/Mazu/jjery2243542/voice_conversion/model')
