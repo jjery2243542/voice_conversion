@@ -16,14 +16,15 @@ class Hps(object):
         self.hps = namedtuple('hps', [
             'lr',
             'alpha',
-            'beta',
+            'beta1',
+            'beta2',
             'max_step',
             'batch_size',
             'pretrain_iterations',
             'iterations',
             ]
         )
-        default = [2e-3, 1, 1e-4, 5, 16, 2000, 100000]
+        default = [2e-3, 1, 1e-4, 1e-4, 5, 16, 2000, 100000]
         self._hps = self.hps._make(default)
 
     def get_tuple(self):
@@ -39,7 +40,7 @@ class Hps(object):
             json.dump(self._hps._asdict(), f_json, indent=4, separators=(',', ': '))
 
 class Sampler(object):
-    def __init__(self, h5_path, speaker_sex_path, max_step=5):
+    def __init__(self, h5_path, speaker_sex_path, max_step=10):
         self.f_h5 = h5py.File(h5_path, 'r')
         self.max_step = max_step
         self.read_sex_file(speaker_sex_path)
@@ -68,10 +69,10 @@ class Sampler(object):
     def sample(self):
         # sample two speakers
         #speakerA, speakerB = random.sample(self.speakers, 2)
-        #speakerA = self.rand(self.female_ids)
-        #speakerB = self.rand(self.male_ids)
-        speakerA = self.female_ids[0]
-        speakerB = self.male_ids[0]
+        speakerA = self.rand(self.female_ids)
+        speakerB = self.rand(self.male_ids)
+        #speakerA = self.female_ids[0]
+        #speakerB = self.male_ids[0]
         specA = self.sample_utt(speakerA)
         # sample t and t^k 
         t = random.randint(0, specA.shape[0] - 2)
