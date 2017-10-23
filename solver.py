@@ -81,7 +81,7 @@ class Solver(object):
         self.Decoder.zero_grad()
         self.Discriminator.zero_grad()
 
-    def load_model(self, model_path, suffix, enc_only=False):
+    def load_model(self, model_path, enc_only=False):
         print('load model from {}'.format(model_path))
         with open(model_path, 'rb') as f_in:
             all_model = pickle.load(f_in)
