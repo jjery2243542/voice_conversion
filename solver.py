@@ -104,8 +104,8 @@ class Solver(object):
                 Ec_i_t, Ec_i_tk, Ec_j = self.Encoder_c(X_i_t), self.Encoder_c(X_i_tk), self.Encoder_c(X_j)
                 # train discriminator
                 loss_adv_dis = torch.mean(
-                    (self.Discriminator(Ec_i_t, Ec_i_tk) - 1) ** 2 +
-                    self.Discriminator(Ec_i_t, Ec_j) ** 2
+                    torch.log(self.Discriminator(Ec_i_t, Ec_i_tk)) +
+                    torch.log(1 - self.Discriminator(Ec_i_t, Ec_j))
                 )
                 self.reset_grad()
                 (beta1 * loss_adv_dis).backward()
@@ -130,16 +130,18 @@ class Solver(object):
             # encode
             Es_i_t = self.Encoder_s(X_i_t)
             Es_i_tk = self.Encoder_s(X_i_tk)
+            Ec_i_t = self.Encoder_c(X_i_t)
             Ec_i_tk = self.Encoder_c(X_i_tk)
             loss_sim = torch.sum((Es_i_t - Es_i_tk) ** 2) / batch_size
             E = torch.cat([Es_i_t, Ec_i_tk], dim=1)
             X_tilde = self.Decoder(E)
             loss_rec = torch.sum((X_tilde - X_i_tk) ** 2) / batch_size
             if not is_pretrain:
-                Ec_val = self.Discriminator(Ec_i_tk, Ec_i_tk)
+                Ec_val = self.Discriminator(Ec_i_tk, Ec_i_tk_prime)
                 mean_Ec_val = torch.mean(Ec_val)
-                loss_adv_enc = torch.mean(
-                    (Ec_val - 0.5) ** 2
+                loss_adv_enc = -torch.mean(
+                    0.5 * torch.log(Ec_val) + 
+                    0.5 * torch.log(1 - Ec_val)
                 )
                 loss = loss_rec + alpha * loss_sim + beta2 * loss_adv_enc
             else:
