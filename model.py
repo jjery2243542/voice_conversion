@@ -26,7 +26,7 @@ class Encoder(nn.Module):
         self.conv1 = conv(c_in, 128, kernel_size=(5, 5), stride=1, pad=True, bn=False)
         self.conv2 = conv(128 + c_in, 256, kernel_size=(5, 5), stride=1, pad=True, bn=False)
         self.conv3 = conv(256 + c_in, 128, kernel_size=(5, 5), stride=1, pad=True, bn=False)
-        self.conv4 = conv(128 + c_in, c_out, kernel_size=(1, 1), stride=1, pad=False, bn=False)
+        self.conv4 = conv(128 + c_in, c_out, kernel_size=(5, 5), stride=1, pad=True, bn=False)
 
     def forward(self, x):
         out = self.conv1(x)
