@@ -68,7 +68,8 @@ class Solver(object):
             }
         new_model_path = '{}-{}'.format(model_path, iteration)
         with open(new_model_path, 'wb') as f_out:
-            pickle.dump(all_model, f_out)
+            torch.save(all_model, f_out)
+        #    pickle.dump(all_model, f_out)
         self.model_kept.append(new_model_path)
 
         if len(self.model_kept) >= self.max_keep:
@@ -99,39 +100,49 @@ class Solver(object):
         for iteration in range(pretrain_iterations if is_pretrain else iterations):
             if not is_pretrain:
                 #===================== Train D =====================#
-                X_i_t, X_i_tk, X_j = [self.to_var(x) for x in next(self.data_loader)]
+                X_i_t, X_i_tk, _, X_j = [self.to_var(x) for x in next(self.data_loader)]
                 # encode
                 Ec_i_t, Ec_i_tk, Ec_j = self.Encoder_c(X_i_t), self.Encoder_c(X_i_tk), self.Encoder_c(X_j)
+                same_prob = self.Discriminator(Ec_i_t, Ec_i_tk)
+                diff_Prob = self.Discriminator(Ec_i_t, Ec_j)
                 # train discriminator
                 loss_adv_dis = torch.mean(
-                    torch.log(self.Discriminator(Ec_i_t, Ec_i_tk)) +
-                    torch.log(1 - self.Discriminator(Ec_i_t, Ec_j))
+                    torch.log(same_prob) +
+                    torch.log(1 - diff_prob)
                 )
                 self.reset_grad()
                 (beta1 * loss_adv_dis).backward()
                 self.D_opt.step()
+                # calculate accuracy
+                dis_acc_same = torch.mean(torch.ge(same_prob, 0.5).type(torch.FloatTensor))
+                dis_acc_diff = torch.mean(torch.lt(diff_prob, 0.5).type(torch.FloatTensor))
                 # print info
                 slot_value = (
                     iteration,
                     iterations,
                     loss_adv_dis.data[0],
+                    dis_acc_same.data[0],
+                    dis_acc_diff.data[0],
                 )
                 print(
-                    'D-iteration:[%06d/%06d], loss_adv_dis=%.3f' 
+                    'D-iteration:[%06d/%06d], loss_adv_dis=%.3f, dis_acc_same=%.3f, dis_acc_diff=%.3f' 
                     % slot_value,
                 )
                 info = {
                     'loss_adv_dis':loss_adv_dis.data[0],
+                    'dis_acc_same': dis_acc_same.data[0],
+                    'dis_acc_diff': dis_acc_diff.data[0],
                 }
                 for tag, value in info.items():
                     self.logger.scalar_summary(tag, value, iteration + 1)
             #===================== Train G =====================#
-            X_i_t, X_i_tk, X_j = [self.to_var(x) for x in next(self.data_loader)]
+            X_i_t, X_i_tk, X_i_tk_prime, X_j = [self.to_var(x) for x in next(self.data_loader)]
             # encode
             Es_i_t = self.Encoder_s(X_i_t)
             Es_i_tk = self.Encoder_s(X_i_tk)
             Ec_i_t = self.Encoder_c(X_i_t)
             Ec_i_tk = self.Encoder_c(X_i_tk)
+            Ec_i_tk_prime = self.Encoder_c(X_i_tk_prime)
             loss_sim = torch.sum((Es_i_t - Es_i_tk) ** 2) / batch_size
             E = torch.cat([Es_i_t, Ec_i_tk], dim=1)
             X_tilde = self.Decoder(E)
