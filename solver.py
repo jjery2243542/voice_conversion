@@ -68,9 +68,10 @@ class Solver(object):
             }
         new_model_path = '{}-{}'.format(model_path, iteration)
         with open(new_model_path, 'wb') as f_out:
-            pickle.dump(all_model, f_out)
+            #pickle.dump(all_model, f_out)
+            torch.save(all_model, f_out)
         self.model_kept.append(new_model_path)
-
+        print('save model to {}'.format(new_model_path))
         if len(self.model_kept) >= self.max_keep:
             os.remove(self.model_kept[0])
             self.model_kept.pop(0)
@@ -84,12 +85,12 @@ class Solver(object):
     def load_model(self, model_path, enc_only=False):
         print('load model from {}'.format(model_path))
         with open(model_path, 'rb') as f_in:
-            all_model = pickle.load(f_in)
+            all_model = torch.load(f_in)
             self.Encoder_s.load_state_dict(all_model['encoder_s'])
             self.Encoder_c.load_state_dict(all_model['encoder_c'])
             self.Decoder.load_state_dict(all_model['decoder'])
             if not enc_only:
-            self.Discriminator.load_state_dict(all_model['discriminator'])
+                self.Discriminator.load_state_dict(all_model['discriminator'])
 
 
     def train(self, model_path, is_pretrain=False):
