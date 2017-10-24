@@ -68,19 +68,20 @@ class Sampler(object):
 
     def sample(self):
         # sample two speakers
-        #speakerA, speakerB = random.sample(self.speakers, 2)
-        speakerA = self.rand(self.female_ids)
-        speakerB = self.rand(self.male_ids)
+        speakerA, speakerB = random.sample(self.speakers, 2)
+        #speakerA = self.rand(self.female_ids)
+        #speakerB = self.rand(self.male_ids)
         #speakerA = self.female_ids[0]
         #speakerB = self.male_ids[0]
         specA = self.sample_utt(speakerA)
         # sample t and t^k 
         t = random.randint(0, specA.shape[0] - 2)
         t_k = random.randint(t, min(specA.shape[0] - 1, t + self.max_step))
+        t_k_prime = random.randint(t, min(specA.shape[0] - 1, t + self.max_step))
         # sample a segment from speakerB
         specB = self.sample_utt(speakerB)
         j = random.randint(0, specB.shape[0] - 1)
-        return specA[t][0:1], specA[t_k][0:1], specB[j][0:1] 
+        return specA[t][0:1], specA[t_k][0:1], specA[t_k_prime][0:1], specB[j][0:1] 
 
 class DataLoader(object):
     def __init__(self, h5py_path):
@@ -107,11 +108,11 @@ class Logger(object):
         self.writer.add_summary(summary, step)
 
 if __name__ == '__main__':
-    #hps = Hps()
-    #hps.dump('./hps/v1.json')
-    data_loader = DataLoader('/storage/raw_feature/voice_conversion/two_speaker_16_5.h5')
-    for _ in range(10):
-        print(next(data_loader))
+    hps = Hps()
+    hps.dump('./hps/v1.json')
+    #data_loader = DataLoader('/storage/raw_feature/voice_conversion/two_speaker_16_5.h5')
+    #for _ in range(10):
+    #    print(next(data_loader))
     #st = time.time()
     #for i in range(100):
     #    print(i)
