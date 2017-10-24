@@ -97,6 +97,7 @@ class DataLoader(object):
             self.index = 0
         return self.f_h5['{}/X_i_t'.format(self.index)][()],\
             self.f_h5['{}/X_i_tk'.format(self.index)][()],\
+            self.f_h5['{}/X_i_tk_prime'.format(self.index)][()],\
             self.f_h5['{}/X_j'.format(self.index)][()]
 
 class Logger(object):
