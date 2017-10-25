@@ -69,7 +69,6 @@ class Solver(object):
         new_model_path = '{}-{}'.format(model_path, iteration)
         with open(new_model_path, 'wb') as f_out:
             torch.save(all_model, f_out)
-        #    pickle.dump(all_model, f_out)
         self.model_kept.append(new_model_path)
 
         if len(self.model_kept) >= self.max_keep:
@@ -106,7 +105,7 @@ class Solver(object):
                 same_prob = self.Discriminator(Ec_i_t, Ec_i_tk)
                 diff_Prob = self.Discriminator(Ec_i_t, Ec_j)
                 # train discriminator
-                loss_adv_dis = torch.mean(
+                loss_adv_dis = -torch.mean(
                     torch.log(same_prob) +
                     torch.log(1 - diff_prob)
                 )
@@ -144,12 +143,20 @@ class Solver(object):
             Ec_i_tk = self.Encoder_c(X_i_tk)
             Ec_i_tk_prime = self.Encoder_c(X_i_tk_prime)
             loss_sim = torch.sum((Es_i_t - Es_i_tk) ** 2) / batch_size
-            E = torch.cat([Es_i_t, Ec_i_tk], dim=1)
-            X_tilde = self.Decoder(E)
-            loss_rec = torch.sum((X_tilde - X_i_tk) ** 2) / batch_size
+            # Reconstruct 2 batches
+            E_tk = torch.cat([Es_i_t, Ec_i_tk], dim=1)
+            X_tilde = self.Decoder(E_tk)
+            loss_rec1 = torch.sum((X_tilde - X_i_tk) ** 2) / batch_size
+            E_tk_prime = torch.cat([Es_i_t, Ec_i_tk_prime], dim=1)
+            X_tilde = self.Decoder(E_tk_prime)
+            loss_rec2 = torch.sum((X_tilde - X_i_tk_prime) ** 2) / batch_size
+            loss_rec = (loss_rec1 + loss_rec2) / 2
             if not is_pretrain:
-                Ec_val = self.Discriminator(Ec_i_tk, Ec_i_tk_prime)
-                mean_Ec_val = torch.mean(Ec_val)
+                Ec_val1 = self.Discriminator(Ec_i_t, Ec_i_tk)
+                Ec_val2 = self.Discriminator(Ec_i_t, Ec_i_tk_prime)
+                Ec_val3 = self.Discriminator(Ec_i_tk, Ec_i_tk_prime)
+                Ec_val = torch.cat([Ec_val1, Ec_val2, Ec_val3], dim=0)
+                print(Ec_val.size())
                 loss_adv_enc = -torch.mean(
                     0.5 * torch.log(Ec_val) + 
                     0.5 * torch.log(1 - Ec_val)
@@ -160,6 +167,7 @@ class Solver(object):
             self.reset_grad()
             loss.backward()
             self.G_opt.step()
+            mean_Ec_val = torch.mean(Ec_val)
             # print info
             slot_value = (
                 iteration,

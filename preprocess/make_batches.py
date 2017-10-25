@@ -4,9 +4,9 @@ from utils import Sampler
 import h5py
 import numpy as np
 
-max_step=5
+max_step=10
 batch_size=16
-n_batches=20000
+n_batches=50000
 
 if __name__ == '__main__':
     if len(sys.argv) < 4:
