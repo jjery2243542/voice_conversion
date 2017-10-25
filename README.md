@@ -8,3 +8,4 @@
 - Preprocess batches with prime
 - test code
 - Finish post processing code
+- Add another GAN to guide the output
