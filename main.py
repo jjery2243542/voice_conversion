@@ -17,13 +17,14 @@ if __name__ == '__main__':
     parser.add_argument('--train', action='store_true')
     args = parser.parse_args()
     hps = Hps()
-    hps.load('./hps/v1.json')
+    hps.load('./hps/v2.json')
     hps_tuple = hps.get_tuple()
     data_loader = DataLoader(
-        '/storage/raw_feature/voice_conversion/two_speaker_16_5.h5'
+        '/nfs/Mazu/jjery2243542/voice_conversion/datasets/multi_sex_16_10.h5', 
+        batch_size=hps_tuple.batch_size
     )
     solver = Solver(hps_tuple, data_loader)
     if args.pretrain:
-        solver.pretrain_discri('/storage/model/voice_conversion')
+        solver.train('/nfs/Mazu/jjery2243542/voice_conversion/model/pretrain.pkl', is_pretrain=True)
     if args.train:
-        solver.train('/nfs/Mazu/jjery2243542/voice_conversion/model')
+        solver.train('/nfs/Mazu/jjery2243542/voice_conversion/model/model.pkl', is_pretrain=False)

@@ -18,13 +18,15 @@ class Hps(object):
             'alpha',
             'beta1',
             'beta2',
+            'max_grad_norm',
             'max_step',
+            'g_iterations',
             'batch_size',
             'pretrain_iterations',
             'iterations',
             ]
         )
-        default = [2e-3, 1, 1e-4, 1e-4, 5, 16, 2000, 100000]
+        default = [2e-4, 1, 1e-1, 1e-1, 2, 5, 10, 8, 1400, 1000]
         self._hps = self.hps._make(default)
 
     def get_tuple(self):
@@ -84,10 +86,11 @@ class Sampler(object):
         return specA[t][0:1], specA[t_k][0:1], specA[t_k_prime][0:1], specB[j][0:1] 
 
 class DataLoader(object):
-    def __init__(self, h5py_path):
+    def __init__(self, h5py_path, batch_size=8):
         self.f_h5 = h5py.File(h5py_path)
         self.keys = list(self.f_h5.keys())
         self.index = 0
+        self.batch_size = batch_size
 
     def __iter__(self):
         return self
@@ -95,10 +98,14 @@ class DataLoader(object):
     def __next__(self):
         if self.index >= len(self.keys):
             self.index = 0
-        return self.f_h5['{}/X_i_t'.format(self.index)][()],\
-            self.f_h5['{}/X_i_tk'.format(self.index)][()],\
-            self.f_h5['{}/X_i_tk_prime'.format(self.index)][()],\
-            self.f_h5['{}/X_j'.format(self.index)][()]
+        #return self.f_h5['{}/X_i_t'.format(self.index)][()],\
+        #    self.f_h5['{}/X_i_tk'.format(self.index)][()],\
+        #    self.f_h5['{}/X_i_tk_prime'.format(self.index)][()],\
+        #    self.f_h5['{}/X_j'.format(self.index)][()]
+        return self.f_h5['{}/X_i_t'.format(self.index)][0:self.batch_size],\
+            self.f_h5['{}/X_i_tk'.format(self.index)][0:self.batch_size],\
+            self.f_h5['{}/X_i_tk_prime'.format(self.index)][0:self.batch_size],\
+            self.f_h5['{}/X_j'.format(self.index)][0:self.batch_size]
 
 class Logger(object):
     def __init__(self, log_dir='./log'):
@@ -110,7 +117,7 @@ class Logger(object):
 
 if __name__ == '__main__':
     hps = Hps()
-    hps.dump('./hps/v1.json')
+    hps.dump('./hps/v2.json')
     #data_loader = DataLoader('/storage/raw_feature/voice_conversion/two_speaker_16_5.h5')
     #for _ in range(10):
     #    print(next(data_loader))

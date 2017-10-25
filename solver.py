@@ -89,12 +89,18 @@ class Solver(object):
             self.Encoder_c.load_state_dict(all_model['encoder_c'])
             self.Decoder.load_state_dict(all_model['decoder'])
             if not enc_only:
-            self.Discriminator.load_state_dict(all_model['discriminator'])
+                self.Discriminator.load_state_dict(all_model['discriminator'])
 
+    def grad_clip(self, net_list):
+        max_grad_norm = self.hps.max_grad_norm
+        for net in net_list:
+            torch.nn.utils.clip_grad_norm(net.parameters(), max_grad_norm)
 
     def train(self, model_path, is_pretrain=False):
         batch_size = self.hps.batch_size
         pretrain_iterations, iterations = self.hps.pretrain_iterations, self.hps.iterations
+        g_iterations = self.hps.g_iterations
+        max_grad_norm = self.hps.max_grad_norm
         alpha, beta1, beta2 = self.hps.alpha, self.hps.beta1, self.hps.beta2
         for iteration in range(pretrain_iterations if is_pretrain else iterations):
             if not is_pretrain:
@@ -103,7 +109,7 @@ class Solver(object):
                 # encode
                 Ec_i_t, Ec_i_tk, Ec_j = self.Encoder_c(X_i_t), self.Encoder_c(X_i_tk), self.Encoder_c(X_j)
                 same_prob = self.Discriminator(Ec_i_t, Ec_i_tk)
-                diff_Prob = self.Discriminator(Ec_i_t, Ec_j)
+                diff_prob = self.Discriminator(Ec_i_t, Ec_j)
                 # train discriminator
                 loss_adv_dis = -torch.mean(
                     torch.log(same_prob) +
@@ -111,6 +117,7 @@ class Solver(object):
                 )
                 self.reset_grad()
                 (beta1 * loss_adv_dis).backward()
+                self.grad_clip([self.discriminator])
                 self.D_opt.step()
                 # calculate accuracy
                 dis_acc_same = torch.mean(torch.ge(same_prob, 0.5).type(torch.FloatTensor))
@@ -135,52 +142,54 @@ class Solver(object):
                 for tag, value in info.items():
                     self.logger.scalar_summary(tag, value, iteration + 1)
             #===================== Train G =====================#
-            X_i_t, X_i_tk, X_i_tk_prime, X_j = [self.to_var(x) for x in next(self.data_loader)]
-            # encode
-            Es_i_t = self.Encoder_s(X_i_t)
-            Es_i_tk = self.Encoder_s(X_i_tk)
-            Ec_i_t = self.Encoder_c(X_i_t)
-            Ec_i_tk = self.Encoder_c(X_i_tk)
-            Ec_i_tk_prime = self.Encoder_c(X_i_tk_prime)
-            loss_sim = torch.sum((Es_i_t - Es_i_tk) ** 2) / batch_size
-            # Reconstruct 2 batches
-            E_tk = torch.cat([Es_i_t, Ec_i_tk], dim=1)
-            X_tilde = self.Decoder(E_tk)
-            loss_rec1 = torch.sum((X_tilde - X_i_tk) ** 2) / batch_size
-            E_tk_prime = torch.cat([Es_i_t, Ec_i_tk_prime], dim=1)
-            X_tilde = self.Decoder(E_tk_prime)
-            loss_rec2 = torch.sum((X_tilde - X_i_tk_prime) ** 2) / batch_size
-            loss_rec = (loss_rec1 + loss_rec2) / 2
-            if not is_pretrain:
-                Ec_val1 = self.Discriminator(Ec_i_t, Ec_i_tk)
-                Ec_val2 = self.Discriminator(Ec_i_t, Ec_i_tk_prime)
-                Ec_val3 = self.Discriminator(Ec_i_tk, Ec_i_tk_prime)
-                Ec_val = torch.cat([Ec_val1, Ec_val2, Ec_val3], dim=0)
-                print(Ec_val.size())
-                loss_adv_enc = -torch.mean(
-                    0.5 * torch.log(Ec_val) + 
-                    0.5 * torch.log(1 - Ec_val)
+            for j in range(1 if is_pretrain else g_iterations):
+                X_i_t, X_i_tk, X_i_tk_prime, X_j = [self.to_var(x) for x in next(self.data_loader)]
+                # encode
+                Es_i_t = self.Encoder_s(X_i_t)
+                Es_i_tk = self.Encoder_s(X_i_tk)
+                Ec_i_t = self.Encoder_c(X_i_t)
+                Ec_i_tk = self.Encoder_c(X_i_tk)
+                Ec_i_tk_prime = self.Encoder_c(X_i_tk_prime)
+                loss_sim = torch.sum((Es_i_t - Es_i_tk) ** 2) / batch_size
+                # Reconstruct 2 batches
+                E_tk = torch.cat([Es_i_t, Ec_i_tk], dim=1)
+                X_tilde = self.Decoder(E_tk)
+                loss_rec1 = torch.sum((X_tilde - X_i_tk) ** 2) / batch_size
+                E_tk_prime = torch.cat([Es_i_t, Ec_i_tk_prime], dim=1)
+                X_tilde = self.Decoder(E_tk_prime)
+                loss_rec2 = torch.sum((X_tilde - X_i_tk_prime) ** 2) / batch_size
+                loss_rec = (loss_rec1 + loss_rec2) / 2
+                if not is_pretrain:
+                    Ec_val1 = self.Discriminator(Ec_i_t, Ec_i_tk)
+                    Ec_val2 = self.Discriminator(Ec_i_t, Ec_i_tk_prime)
+                    Ec_val3 = self.Discriminator(Ec_i_tk, Ec_i_tk_prime)
+                    Ec_val = torch.cat([Ec_val1, Ec_val2, Ec_val3], dim=0)
+                    loss_adv_enc = -torch.mean(
+                        0.5 * torch.log(Ec_val) + 
+                        0.5 * torch.log(1 - Ec_val)
+                    )
+                    loss = loss_rec + alpha * loss_sim + beta2 * loss_adv_enc
+                    mean_Ec_val = torch.mean(Ec_val)
+                else:
+                    loss = loss_rec + alpha * loss_sim
+                self.reset_grad()
+                loss.backward()
+                self.grad_clip([self.Encoder_s, self.Encoder_c, self.Decoder])
+                self.G_opt.step()
+                # print info
+                slot_value = (
+                    j + 1, 
+                    iteration,
+                    pretrain_iterations if is_pretrain else iterations,
+                    loss_rec.data[0],
+                    loss_sim.data[0],
+                    0 if is_pretrain else loss_adv_enc.data[0],
+                    0 if is_pretrain else mean_Ec_val.data[0],
                 )
-                loss = loss_rec + alpha * loss_sim + beta2 * loss_adv_enc
-            else:
-                loss = loss_rec + alpha * loss_sim
-            self.reset_grad()
-            loss.backward()
-            self.G_opt.step()
-            mean_Ec_val = torch.mean(Ec_val)
-            # print info
-            slot_value = (
-                iteration,
-                pretrain_iterations if is_pretrain else iterations,
-                loss_rec.data[0],
-                loss_sim.data[0],
-                0 if is_pretrain else loss_adv_enc.data[0],
-                0 if is_pretrain else mean_Ec_val.data[0],
-            )
-            print(
-                'G-iteration:[%06d/%06d], loss_rec=%.3f, loss_sim=%.3f, loss_adv_enc=%.3f, mean_val=%.3f' 
-                % slot_value,
-            )
+                print(
+                    'G-iteration-%d:[%06d/%06d], loss_rec=%.3f, loss_sim=%.3f, loss_adv_enc=%.3f, mean_val=%.3f' 
+                    % slot_value,
+                )
             info = {
                 'loss_rec':loss_rec.data[0],
                 'loss_sim':loss_sim.data[0],
