@@ -16,17 +16,17 @@ class Hps(object):
         self.hps = namedtuple('hps', [
             'lr',
             'alpha',
-            'beta1',
-            'beta2',
+            'beta',
+            'hidden_dim',
             'max_grad_norm',
+            'margin',
             'max_step',
             'g_iterations',
             'batch_size',
-            'pretrain_iterations',
             'iterations',
             ]
         )
-        default = [2e-4, 1, 1e-1, 1e-1, 2, 5, 10, 8, 1400, 1000]
+        default = [5e-4, 1, 0.1, 1024, 1, 0.5, 10, 10, 8, 15000]
         self._hps = self.hps._make(default)
 
     def get_tuple(self):

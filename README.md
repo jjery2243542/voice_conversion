@@ -9,3 +9,5 @@
 - test code
 - Finish post processing code
 - Add another GAN to guide the output
+- Decoder add true residual
+- Decoder activation turn to sigmoid

@@ -20,13 +20,15 @@ def conv(c_in, c_out, kernel_size, stride=1, pad=True, bn=True):
         layers.append(nn.BatchNorm2d(c_out))
     return nn.Sequential(*layers)
 
-class Encoder(nn.Module):
+class Decoder(nn.Module):
     def __init__(self, c_in, c_out):
-        super(Encoder, self).__init__()
+        super(Decoder, self).__init__()
         self.conv1 = conv(c_in, 128, kernel_size=(5, 5), stride=1, pad=True, bn=False)
         self.conv2 = conv(128 + c_in, 256, kernel_size=(5, 5), stride=1, pad=True, bn=False)
-        self.conv3 = conv(256 + c_in, 128, kernel_size=(5, 5), stride=1, pad=True, bn=False)
-        self.conv4 = conv(128 + c_in, c_out, kernel_size=(5, 5), stride=1, pad=True, bn=False)
+        self.conv3 = conv(256 + c_in, 256, kernel_size=(5, 5), stride=1, pad=True, bn=False)
+        self.conv4 = conv(256 + c_in, 128, kernel_size=(5, 5), stride=1, pad=True, bn=False)
+        self.conv5 = conv(128 + c_in, 128, kernel_size=(5, 5), stride=1, pad=True, bn=False)
+        self.conv6 = conv(128 + c_in, c_out, kernel_size=(5, 5), stride=1, pad=True, bn=False)
 
     def forward(self, x):
         out = self.conv1(x)
@@ -40,6 +42,33 @@ class Encoder(nn.Module):
         out = torch.cat((out, x), 1)
         out = self.conv4(out)
         out = F.leaky_relu(out)
+        out = torch.cat((out, x), 1)
+        out = self.conv5(out)
+        out = F.leaky_relu(out)
+        out = torch.cat((out, x), 1)
+        out = self.conv6(out)
+        out = F.sigmoid(out)
+        return out
+
+
+class Encoder(nn.Module):
+    def __init__(self, c_in, c_out):
+        super(Encoder, self).__init__()
+        self.conv1 = conv(c_in, 128, kernel_size=(5, 5), stride=1, pad=True, bn=False)
+        self.conv2 = conv(128 + c_in, 256, kernel_size=(5, 5), stride=1, pad=True, bn=False)
+        self.conv3 = conv(256 + c_in, 128, kernel_size=(5, 5), stride=1, pad=True, bn=False)
+        self.conv4 = conv(128, c_out, kernel_size=(5, 5), stride=1, pad=True, bn=False)
+
+    def forward(self, x):
+        out = self.conv1(x)
+        out = F.leaky_relu(out)
+        out = torch.cat((out, x), 1)
+        out = self.conv2(out)
+        out = F.leaky_relu(out)
+        out = torch.cat((out, x), 1)
+        out = self.conv3(out)
+        out = F.leaky_relu(out)
+        out = self.conv4(out)
         return out
 
 class Discriminator(nn.Module):
