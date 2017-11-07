@@ -20,6 +20,15 @@ def conv(c_in, c_out, kernel_size, stride=1, pad=True, bn=True):
         layers.append(nn.BatchNorm2d(c_out))
     return nn.Sequential(*layers)
 
+def GLU(channel, kernel_size=11, stride=1):
+    layers = []
+    layers.append(
+        nn.ReflectionPad2d(kernel_size // 2)
+    )
+    layers.append(
+        nn.Conv2d(ch)
+    )
+
 class Decoder(nn.Module):
     def __init__(self, c_in, c_out):
         super(Decoder, self).__init__()

@@ -129,10 +129,6 @@ class DataLoader(object):
     def __next__(self):
         if self.index >= len(self.keys):
             self.index = 0
-        #return self.f_h5['{}/X_i_t'.format(self.index)][()],\
-        #    self.f_h5['{}/X_i_tk'.format(self.index)][()],\
-        #    self.f_h5['{}/X_i_tk_prime'.format(self.index)][()],\
-        #    self.f_h5['{}/X_j'.format(self.index)][()]
         return self.f_h5['{}/X_i_t'.format(self.index)][0:self.batch_size],\
             self.f_h5['{}/X_i_tk'.format(self.index)][0:self.batch_size],\
             self.f_h5['{}/X_i_tk_prime'.format(self.index)][0:self.batch_size],\
@@ -152,11 +148,12 @@ if __name__ == '__main__':
         max_step=5,\
         seg_len=128
     )
+
+    st = time.time()
     for _ in range(500):
         datas = sampler.sample()
-        for data in datas:
-            print(data.shape, end=', ')
-        print()
+    et = time.time()
+    print(et - st)
     #hps = Hps()
     #hps.dump('./hps/v3.json')
     #data_loader = DataLoader('/storage/raw_feature/voice_conversion/two_speaker_16_5.h5')
