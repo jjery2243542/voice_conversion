@@ -294,7 +294,7 @@ def ispecgram(spec,
               re_im=False,
               dphase=True,
               mag_only=True,
-              num_iters=1000):
+              num_iters=2000):
   """Inverse Spectrogram using librosa.
 
   Args:

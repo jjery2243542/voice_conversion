@@ -3,7 +3,7 @@ from scipy.io import wavfile
 import h5py
 import numpy as np
 
-rate=16000
+rate=20000
 
 def specs2wav(specs, wav_filename):
     '''

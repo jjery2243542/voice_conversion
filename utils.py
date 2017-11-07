@@ -41,12 +41,14 @@ class Hps(object):
             json.dump(self._hps._asdict(), f_json, indent=4, separators=(',', ': '))
 
 class Sampler(object):
-    def __init__(self, 
-            h5_path, 
-            speaker_sex_path='/storage/raw_feature/voice_conversion/train-clean-100-speaker-sex.txt', 
-            utt_len_path='/storage/raw_feature/voice_conversion/utterence_length.txt', 
-            max_step=5, 
-            seg_len=128):
+    def __init__(
+        self, 
+        h5_path, 
+        speaker_sex_path='/storage/raw_feature/voice_conversion/train-clean-100-speaker-sex.txt', 
+        utt_len_path='/storage/raw_feature/voice_conversion/utterence_length.txt', 
+        max_step=5, 
+        seg_len=128
+    ):
         self.f_h5 = h5py.File(h5_path, 'r')
         self.max_step = max_step
         self.seg_len = seg_len

@@ -5,7 +5,9 @@ import os
 import glob
 import re
 from collections import defaultdict
+from utils import get_spectrograms
 
+'''DEPRECATE
 def sort_key(x):
     sub = x.split('/')[-1]
     l = re.split('_|-', sub.strip('.npy'))
@@ -54,4 +56,39 @@ if __name__ == '__main__':
                     dtype=np.float32,
                 )
 
-        
+'''
+
+root_dir='/storage/LibriSpeech/LibriSpeech/train-clean-100'
+
+if __name__ == '__main__':
+    if len(sys.argv) < 2:
+        print('usage: python3 make_dataset.py [h5py_path]')
+        exit(0)
+    h5py_path=sys.argv[1]
+    filename_groups = defaultdict(lambda : [])
+    with h5py.File(h5py_path, 'w') as f_h5:
+        grps = [f_h5.create_group('train'), f_h5.create_group('test')]
+        filenames = sorted(glob.glob(os.path.join(root_dir, '*/*/*.flac')))
+        for filename in filenames:
+            # divide into groups
+            speaker_id, chapter_id, segment_id = filename.strip().split('/')[-1].strip('.flac').split('-')
+            filename_groups[speaker_id].append(filename)
+        for speaker_id, filenames in filename_groups.items():
+            print('processing {}'.format(speaker_id))
+            for filename in filenames[:-1]:
+                print(filename)
+                speaker_id, chapter_id, segment_id = filename.strip().split('/')[-1].strip('.flac').split('-')
+                mel_spec, lin_spec = get_spectrograms(filename)
+                grps[0].create_dataset('{}/{}-{}/mel'.format(speaker_id, chapter_id, segment_id), \
+                    data=mel_spec, dtype=np.float32)
+                grps[0].create_dataset('{}/{}-{}/lin'.format(speaker_id, chapter_id, segment_id),\
+                    data=lin_spec, dtype=np.float32)
+            # the last segment put into testset
+            filename = filenames[-1]
+            speaker_id, chapter_id, segment_id = filename.strip().split('/')[-1].strip('.flac').split('-')
+            mel_spec, lin_spec = get_spectrograms(filename)
+            grps[1].create_dataset('{}/{}-{}/mel'.format(speaker_id, chapter_id, segment_id), \
+                data=mel_spec, dtype=np.float32)
+            grps[1].create_dataset('{}/{}-{}/lin'.format(speaker_id, chapter_id, segment_id), \
+                data=lin_spec, dtype=np.float32)
+
