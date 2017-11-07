@@ -42,7 +42,7 @@ class Hps(object):
             json.dump(self._hps._asdict(), f_json, indent=4, separators=(',', ': '))
 
 class Sampler(object):
-    def __init__(self, h5_path, speaker_sex_path, max_step=10):
+    def __init__(self, h5_path, speaker_sex_path, max_step=5, seg_len=128):
         self.f_h5 = h5py.File(h5_path, 'r')
         self.max_step = max_step
         self.read_sex_file(speaker_sex_path)
@@ -61,8 +61,8 @@ class Sampler(object):
     def sample_utt(self, speaker_id):
         # sample an utterence
         utt_id = self.rand(self.speaker2utts[speaker_id])
-        spec = self.f_h5['train/{}/{}'.format(speaker_id, utt_id)]
-        return spec
+        length = self.f_h5['train/{}/{}/mel'.format(speaker_id, utt_id)].shape[0]
+        return utt_id, length
 
     def rand(self, l):
         rand_idx = random.randint(0, len(l) - 1)
@@ -71,19 +71,22 @@ class Sampler(object):
     def sample(self):
         # sample two speakers
         speakerA, speakerB = random.sample(self.speakers, 2)
-        #speakerA = self.rand(self.female_ids)
-        #speakerB = self.rand(self.male_ids)
-        #speakerA = self.female_ids[0]
-        #speakerB = self.male_ids[0]
-        specA = self.sample_utt(speakerA)
+        A_utt_id, A_length = self.sample_utt(speakerA)
+        B_utt_id, B_length = self.sample_utt(speakerB)
         # sample t and t^k 
-        t = random.randint(0, specA.shape[0] - 2)
-        t_k = random.randint(t, min(specA.shape[0] - 1, t + self.max_step))
-        t_k_prime = random.randint(t, min(specA.shape[0] - 1, t + self.max_step))
+        t = random.randint(0, A_length - 2 * seg_length)  
+        t_k = random.randint(t + seg_length, min(A_length - seg_length, t + max_step * seg_length))
+        t_k_prime = random.randint(t + seg_length, min(A_length - seg_length, t + max_step * seg_length))
         # sample a segment from speakerB
-        specB = self.sample_utt(speakerB)
-        j = random.randint(0, specB.shape[0] - 1)
-        return specA[t][0:1], specA[t_k][0:1], specA[t_k_prime][0:1], specB[j][0:1] 
+        t_j = random.randint(0, B_length - seg_length)
+        return f_h5['train/{}/{}/mel'.format(speakerA, A_utt_id)][t:t + seg_length], \
+            f_h5['train/{}/{}/lin'.format(speakerA, A_utt_id)][t:t + seg_length],\
+            f_h5['train/{}/{}/mel'.format(speakerA, A_utt_id)][t_k:t_k + seg_length],\
+            f_h5['train/{}/{}/lin'.format(speakerA, A_utt_id)][t_k:t_k + seg_length],\
+            f_h5['train/{}/{}/mel'.format(speakerA, A_utt_id)][t_k_prime:t_k_prime + seg_length],\
+            f_h5['train/{}/{}/lin'.format(speakerA, A_utt_id)][t_k_prime:t_k_prime + seg_length],\
+            f_h5['train/{}/{}/mel'.format(speakerB, B_utt_id)][t_j:t_j + seg_length],\
+            f_h5['train/{}/{}/lin'.format(speakerB, B_utt_id)][t_j:t_j + seg_length]
 
 class DataLoader(object):
     def __init__(self, h5py_path, batch_size=8):
