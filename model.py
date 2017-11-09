@@ -9,6 +9,54 @@ def get_grad(net):
        print(torch.sum(p.grad), p.size())
     return
 
+class Decoder(nn.Module):
+    def __init__(self, c_in, c_out):
+        super(Decoder, self).__init__()
+        #self.conv1 = nn.Conv1d()
+    
+class Encoder(nn.Module):
+    def __init__(self, c_in, c_out):
+        super(Encoder, self).__init__()
+        self.conv1 = nn.Conv1d(c_in, c_out, kernel_size=11)
+        self.conv2 = nn.Conv1d(c_out, 2 * c_out, kernel_size=11)
+        self.conv3 = nn.Conv1d(c_out, 2 * c_out, kernel_size=11)
+        self.conv4 = nn.Conv1d(c_out, 2 * c_out, kernel_size=11)
+        self.conv5 = nn.Conv1d(c_out, c_out // 2, kernel_size=15, stride=2)
+        self.conv6 = nn.Conv1d(c_out // 2, c_out // 4, kernel_size=19, stride=2)
+
+    def forward(self, x):
+        out = self.conv(x, self.conv1)
+        out = self.GLU(out, self.conv2)
+        out = self.GLU(out, self.conv3)
+        out = self.GLU(out, self.conv4)
+        out = self.conv(out, self.conv5)
+        out = self.conv(out, self.conv6)
+        return out
+         
+    def conv(self, inp, layer):
+        kernel_size = layer.kernel_size[0]
+        # padding
+        out = F.pad(torch.unsqueeze(inp, dim=3), pad=(0, 0, kernel_size//2, kernel_size//2), mode='reflect')
+        out = out.squeeze(dim=3)
+        out = layer(out)
+        out = F.leaky_relu(out)
+        return out
+        
+    def GLU(self, inp, layer):
+        kernel_size = layer.kernel_size[0]
+        in_channels = layer.in_channels 
+        # padding
+        out = F.pad(inp.unsqueeze(dim=3), pad=(0,0,kernel_size // 2,kernel_size // 2), mode='reflect')
+        out = out.squeeze(dim=3)
+        # conv
+        out = layer(out)
+        # gated
+        A = out[:, :in_channels, :] + inp
+        B = F.sigmoid(out[:, in_channels:, :])
+        H = A * B
+        return H
+
+'''DEPRECATE
 def conv(c_in, c_out, kernel_size, stride=1, pad=True, bn=True):
     layers = []
     if pad:
@@ -19,15 +67,6 @@ def conv(c_in, c_out, kernel_size, stride=1, pad=True, bn=True):
     if bn:
         layers.append(nn.BatchNorm2d(c_out))
     return nn.Sequential(*layers)
-
-def GLU(channel, kernel_size=11, stride=1):
-    layers = []
-    layers.append(
-        nn.ReflectionPad2d(kernel_size // 2)
-    )
-    layers.append(
-        nn.Conv2d(ch)
-    )
 
 class Decoder(nn.Module):
     def __init__(self, c_in, c_out):
@@ -102,27 +141,10 @@ class Discriminator(nn.Module):
         out = self.fc(out).squeeze()
         out = F.sigmoid(out)
         return out
+'''
 
 if __name__ == '__main__':
-    E_s = Encoder(1, 1).cuda()
-    total = Variable(torch.Tensor([0])).cuda()
-    E_c = Encoder(1, 1).cuda()
-    D = Encoder(2, 1).cuda()
-    C = Discriminator(2).cuda()
-    np.random.seed(0)
-    d1 = Variable(torch.from_numpy(np.random.rand(16, 1, 257, 64))).type(torch.FloatTensor).cuda()
-    d2 = Variable(torch.from_numpy(np.random.rand(16, 1, 257, 64))).type(torch.FloatTensor).cuda()
-    e1 = E_s(d1)
-    print(e1.data)
-    e2 = E_s(d2)
-    e3 = E_c(d2)
-    print(e3.data)
-    dec1 = D(torch.cat((e1, e3), dim=1))
-    print(dec1.data)
-    print(dec1.requires_grad)
-    loss_sim = torch.sum((e2 - e1) ** 2) / 16
-    loss_rec = torch.sum((dec1 - d2) ** 2) / 16
-    print(loss_rec.data[0])
-    E_s.zero_grad()
-    loss_rec.backward()
-    get_grad(E_s)
+    E = Encoder(80, 256)
+    inp = Variable(torch.randn(16, 80, 128))
+    e = E(inp)
+    print(e.size())
