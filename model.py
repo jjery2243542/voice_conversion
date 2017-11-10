@@ -9,52 +9,77 @@ def get_grad(net):
        print(torch.sum(p.grad), p.size())
     return
 
+def conv(inp, layer):
+    kernel_size = layer.kernel_size[0]
+    # padding
+    out = F.pad(torch.unsqueeze(inp, dim=3), pad=(0, 0, kernel_size//2, kernel_size//2), mode='reflect')
+    out = out.squeeze(dim=3)
+    out = layer(out)
+    out = F.leaky_relu(out)
+    return out
+
+def upsample(x, scale_factor=2):
+    # reshape
+    x = x.unsqueeze(dim=3)
+    x_up = F.upsample(x, scale_factor=2, mode='nearest')[:, :, :, 0]
+    return x_up
+
+def GLU(inp, layer, res=True):
+    kernel_size = layer.kernel_size[0]
+    channels = layer.out_channels // 2 
+    # padding
+    out = F.pad(inp.unsqueeze(dim=3), pad=(0, 0, kernel_size//2, kernel_size//2), mode='reflect')
+    out = out.squeeze(dim=3)
+    # conv
+    out = layer(out)
+    # gated
+    if res:
+        A = out[:, :channels, :] + inp
+    else:
+        A = out[:, :channels, :]
+    B = F.sigmoid(out[:, channels:, :])
+    H = A * B
+    return H
+
 class Decoder(nn.Module):
-    def __init__(self, c_in, c_out):
+    def __init__(self, c_in=128, c_out=80, c_h=256):
         super(Decoder, self).__init__()
-        #self.conv1 = nn.Conv1d()
-    
-class Encoder(nn.Module):
-    def __init__(self, c_in, c_out):
-        super(Encoder, self).__init__()
-        self.conv1 = nn.Conv1d(c_in, c_out, kernel_size=11)
-        self.conv2 = nn.Conv1d(c_out, 2 * c_out, kernel_size=11)
-        self.conv3 = nn.Conv1d(c_out, 2 * c_out, kernel_size=11)
-        self.conv4 = nn.Conv1d(c_out, 2 * c_out, kernel_size=11)
-        self.conv5 = nn.Conv1d(c_out, c_out // 2, kernel_size=15, stride=2)
-        self.conv6 = nn.Conv1d(c_out // 2, c_out // 4, kernel_size=19, stride=2)
+        self.conv1 = nn.Conv1d(c_in, 2*c_h, kernel_size=5)
+        self.conv2 = nn.Conv1d(c_h, 2*c_h, kernel_size=5)
+        self.conv3 = nn.Conv1d(c_h, 2*c_h, kernel_size=5)
+        self.conv4 = nn.Conv1d(c_h, 2*c_h, kernel_size=5)
+        self.conv5 = nn.Conv1d(c_h, 2*c_h, kernel_size=5)
+        self.conv6 = nn.Conv1d(c_h, 2*c_out, kernel_size=5)
 
     def forward(self, x):
-        out = self.conv(x, self.conv1)
-        out = self.GLU(out, self.conv2)
-        out = self.GLU(out, self.conv3)
-        out = self.GLU(out, self.conv4)
-        out = self.conv(out, self.conv5)
-        out = self.conv(out, self.conv6)
+        x = upsample(x)
+        out = GLU(x, self.conv1, res=False)
+        out = upsample(out)
+        out = GLU(out, self.conv2)
+        out = GLU(out, self.conv3)
+        out = GLU(out, self.conv4)
+        out = GLU(out, self.conv5)
+        out = GLU(out, self.conv6, res=False)
         return out
-         
-    def conv(self, inp, layer):
-        kernel_size = layer.kernel_size[0]
-        # padding
-        out = F.pad(torch.unsqueeze(inp, dim=3), pad=(0, 0, kernel_size//2, kernel_size//2), mode='reflect')
-        out = out.squeeze(dim=3)
-        out = layer(out)
-        out = F.leaky_relu(out)
+
+class Encoder(nn.Module):
+    def __init__(self, c_in=80, c_h=256):
+        super(Encoder, self).__init__()
+        self.conv1 = nn.Conv1d(c_in, c_h, kernel_size=1)
+        self.conv2 = nn.Conv1d(c_h, 2 * c_h, kernel_size=11)
+        self.conv3 = nn.Conv1d(c_h, 2 * c_h, kernel_size=11)
+        self.conv4 = nn.Conv1d(c_h, 2 * c_h, kernel_size=11)
+        self.conv5 = nn.Conv1d(c_h, c_h, kernel_size=15, stride=2)
+        self.conv6 = nn.Conv1d(c_h // 2, c_h // 2, kernel_size=19, stride=2)
+
+    def forward(self, x):
+        out = conv(x, self.conv1)
+        out = GLU(out, self.conv2)
+        out = GLU(out, self.conv3)
+        out = GLU(out, self.conv4)
+        out = GLU(out, self.conv5, res=False)
+        out = GLU(out, self.conv6, res=False)
         return out
-        
-    def GLU(self, inp, layer):
-        kernel_size = layer.kernel_size[0]
-        in_channels = layer.in_channels 
-        # padding
-        out = F.pad(inp.unsqueeze(dim=3), pad=(0,0,kernel_size // 2,kernel_size // 2), mode='reflect')
-        out = out.squeeze(dim=3)
-        # conv
-        out = layer(out)
-        # gated
-        A = out[:, :in_channels, :] + inp
-        B = F.sigmoid(out[:, in_channels:, :])
-        H = A * B
-        return H
 
 '''DEPRECATE
 def conv(c_in, c_out, kernel_size, stride=1, pad=True, bn=True):
@@ -144,7 +169,12 @@ class Discriminator(nn.Module):
 '''
 
 if __name__ == '__main__':
-    E = Encoder(80, 256)
+    E1, E2 = Encoder(80), Encoder(80)
+    D = Decoder()
     inp = Variable(torch.randn(16, 80, 128))
-    e = E(inp)
-    print(e.size())
+    e1 = E1(inp)
+    e2 = E2(inp)
+    print(e1.size())
+    e = torch.cat([e1, e2], dim=1)
+    d = D(e)
+    print(d.size())
