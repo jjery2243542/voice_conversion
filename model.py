@@ -9,13 +9,15 @@ def get_grad(net):
        print(torch.sum(p.grad), p.size())
     return
 
-def conv(inp, layer):
+def conv(inp, layer, pad=True, act=True):
     kernel_size = layer.kernel_size[0]
     # padding
-    out = F.pad(torch.unsqueeze(inp, dim=3), pad=(0, 0, kernel_size//2, kernel_size//2), mode='reflect')
-    out = out.squeeze(dim=3)
-    out = layer(out)
-    out = F.leaky_relu(out)
+    if pad:
+        inp = F.pad(torch.unsqueeze(inp, dim=3), pad=(0, 0, kernel_size//2, kernel_size//2), mode='reflect')
+        inp = inp.squeeze(dim=3)
+    out = layer(inp)
+    if act:
+        out = F.leaky_relu(out)
     return out
 
 def upsample(x, scale_factor=2):
@@ -40,6 +42,22 @@ def GLU(inp, layer, res=True):
     B = F.sigmoid(out[:, channels:, :])
     H = A * B
     return H
+
+class Discriminator(nn.Module):
+    def __init__(self, c_in=64, c_h=256):
+        super(Discriminator, self).__init__()
+        self.conv1 = nn.Conv1d(c_in, c_h*2, kernel_size=5, stride=2)
+        self.conv2 = nn.Conv1d(c_h, c_h*2, kernel_size=5, stride=2)
+        self.conv3 = nn.Conv1d(c_h, c_h*2, kernel_size=5, stride=2)
+        self.conv4 = nn.Conv1d(c_h, 1, kernel_size=4)
+
+    def forward(self, x):
+        out = GLU(x, self.conv1, res=False)
+        out = GLU(out, self.conv2, res=False)
+        out = GLU(out, self.conv3, res=False)
+        out = conv(out, self.conv4, pad=False, act=False)
+        out = out.view(out.size()[0], -1)
+        return out
 
 class Decoder(nn.Module):
     def __init__(self, c_in=128, c_out=80, c_h=256):
@@ -81,100 +99,15 @@ class Encoder(nn.Module):
         out = GLU(out, self.conv6, res=False)
         return out
 
-'''DEPRECATE
-def conv(c_in, c_out, kernel_size, stride=1, pad=True, bn=True):
-    layers = []
-    if pad:
-        layers.append(
-            nn.ReflectionPad2d(kernel_size[0] // 2)
-        )
-    layers.append(nn.Conv2d(c_in, c_out, kernel_size, stride=stride))
-    if bn:
-        layers.append(nn.BatchNorm2d(c_out))
-    return nn.Sequential(*layers)
-
-class Decoder(nn.Module):
-    def __init__(self, c_in, c_out):
-        super(Decoder, self).__init__()
-        self.conv1 = conv(c_in, 128, kernel_size=(5, 5), stride=1, pad=True, bn=False)
-        self.conv2 = conv(128 + c_in, 256, kernel_size=(5, 5), stride=1, pad=True, bn=False)
-        self.conv3 = conv(256 + c_in, 256, kernel_size=(5, 5), stride=1, pad=True, bn=False)
-        self.conv4 = conv(256 + c_in, 128, kernel_size=(5, 5), stride=1, pad=True, bn=False)
-        self.conv5 = conv(128 + c_in, 128, kernel_size=(5, 5), stride=1, pad=True, bn=False)
-        self.conv6 = conv(128 + c_in, c_out, kernel_size=(5, 5), stride=1, pad=True, bn=False)
-
-    def forward(self, x):
-        out = self.conv1(x)
-        out = F.leaky_relu(out)
-        out = torch.cat((out, x), 1)
-        out = self.conv2(out)
-        out = F.leaky_relu(out)
-        out = torch.cat((out, x), 1)
-        out = self.conv3(out)
-        out = F.leaky_relu(out)
-        out = torch.cat((out, x), 1)
-        out = self.conv4(out)
-        out = F.leaky_relu(out)
-        out = torch.cat((out, x), 1)
-        out = self.conv5(out)
-        out = F.leaky_relu(out)
-        out = torch.cat((out, x), 1)
-        out = self.conv6(out)
-        out = F.sigmoid(out)
-        return out
-
-
-class Encoder(nn.Module):
-    def __init__(self, c_in, c_out):
-        super(Encoder, self).__init__()
-        self.conv1 = conv(c_in, 128, kernel_size=(5, 5), stride=1, pad=True, bn=False)
-        self.conv2 = conv(128 + c_in, 256, kernel_size=(5, 5), stride=1, pad=True, bn=False)
-        self.conv3 = conv(256 + c_in, 128, kernel_size=(5, 5), stride=1, pad=True, bn=False)
-        self.conv4 = conv(128, c_out, kernel_size=(5, 5), stride=1, pad=True, bn=False)
-
-    def forward(self, x):
-        out = self.conv1(x)
-        out = F.leaky_relu(out)
-        out = torch.cat((out, x), 1)
-        out = self.conv2(out)
-        out = F.leaky_relu(out)
-        out = torch.cat((out, x), 1)
-        out = self.conv3(out)
-        out = F.leaky_relu(out)
-        out = self.conv4(out)
-        return out
-
-class Discriminator(nn.Module):
-    def __init__(self, c_in, image_size=(257, 64)):
-        super(Discriminator, self).__init__()
-        self.conv1 = conv(c_in, 64, kernel_size=(5, 5), stride=2, bn=False, pad=True)
-        self.conv2 = conv(64, 128, kernel_size=(5, 5), stride=2, bn=True, pad=True)
-        self.conv3 = conv(128, 256, kernel_size=(5, 5), stride=2, bn=True, pad=True)
-        self.conv4 = conv(256, 512, kernel_size=(5, 5), stride=2, bn=True, pad=True)
-        self.fc = conv(512, 1, (int(image_size[0] / 16 + 1), int(image_size[1] / 16)), bn=False, pad=False)
-
-    def forward(self, e1, e2):
-        e = torch.cat([e1, e2], dim=1)
-        out = self.conv1(e)
-        out = F.leaky_relu(out)
-        out = self.conv2(out)
-        out = F.leaky_relu(out)
-        out = self.conv3(out)
-        out = F.leaky_relu(out)
-        out = self.conv4(out)
-        out = F.leaky_relu(out)
-        out = self.fc(out).squeeze()
-        out = F.sigmoid(out)
-        return out
-'''
 
 if __name__ == '__main__':
     E1, E2 = Encoder(80), Encoder(80)
     D = Decoder()
+    C = Discriminator()
     inp = Variable(torch.randn(16, 80, 128))
     e1 = E1(inp)
     e2 = E2(inp)
-    print(e1.size())
     e = torch.cat([e1, e2], dim=1)
     d = D(e)
-    print(d.size())
+    c = C(e2)
+    print(c.size())
