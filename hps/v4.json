@@ -1,0 +1,10 @@
+{
+    "lr": 0.0005,
+    "alpha": 1,
+    "beta": 1,
+    "lambda_": 1,
+    "max_grad_norm": 1,
+    "max_step": 5,
+    "batch_size": 16,
+    "iterations": 15000
+}
