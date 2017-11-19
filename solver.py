@@ -8,12 +8,12 @@ import pickle
 from model import Encoder
 from model import Decoder
 from model import Discriminator
-from utils import Hps
-from utils import DataLoader
-from utils import Logger
 from postprocess.utils import ispecgram
 from scipy.io import wavfile
 import os 
+from utils import Hps
+from utils import DataLoader
+from utils import Logger
 
 def cal_mean_grad(net):
     grad = Variable(torch.FloatTensor([0])).cuda()
@@ -142,10 +142,10 @@ class Solver(object):
             # print info
             info = {
                 'D_loss': D_loss.data[0],
-                'w_distance': w_distance[0]
+                'w_distance': w_distance[0],
                 'gradients_penalty': gradients_penalty.data[0],
             }
-            slot_value = (iteration+1, iterations) + tuple(value for value in info.values())
+            slot_value = (iteration+1, iterations) + tuple([value for value in info.values()])
             print(
                 'D:[%06d/%06d], D_loss=%.3f, same_val=%.3f, diff_val=%.3f'
                 % slot_value,
@@ -180,7 +180,7 @@ class Solver(object):
                 'loss_sim': loss_sim.data[0],
                 'G_w_distance': w_distance.data[0],
             }
-            slot_value = (iteration+1, iterations) + (for value in info.values())
+            slot_value = (iteration+1, iterations) + tuple([value for value in info.values()])
             print(
                 'G:[%06d/%06d], loss_rec=%.3f, loss_sim=%.3f, w_distance=%.3f'
                 % slot_value,
@@ -192,11 +192,12 @@ class Solver(object):
 
 if __name__ == '__main__':
     hps = Hps()
-    hps.load('./hps/v1.json')
+    hps.load('./hps/v4.json')
     hps_tuple = hps.get_tuple()
+    print('a')
     data_loader = DataLoader(
-        '/nfs/Mazu/jjery2243542/voice_conversion/datasets/libre_equal.h5',
-        '/nfs/Mazu/jjery2243542/voice_conversion/datasets/train-clean-100-speaker-sex.txt'
+        '/storage/raw_feature/voice_conversion/tacotron_feature/batches_16_128_100000.h5',
     )
+    print('b')
     solver = Solver(hps_tuple, data_loader)
-
+    print('c')

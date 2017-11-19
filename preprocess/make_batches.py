@@ -9,7 +9,7 @@ seg_len=128
 mel_band=80
 lin_band=1025
 batch_size=16
-n_batches=50000
+n_batches=100000
 
 if __name__ == '__main__':
     if len(sys.argv) < 3:

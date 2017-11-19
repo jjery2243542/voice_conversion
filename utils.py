@@ -9,6 +9,7 @@ import math
 import argparse
 import random
 import time
+import torch
 import tensorflow as tf
 
 class Hps(object):
@@ -17,15 +18,14 @@ class Hps(object):
             'lr',
             'alpha',
             'beta',
+            'lambda_',
             'max_grad_norm',
-            'margin',
             'max_step',
-            'g_iterations',
             'batch_size',
             'iterations',
             ]
         )
-        default = [5e-4, 1, 0.1, 1, 0.5, 5, 1, 8, 15000]
+        default = [5e-4, 1, 1, 1, 1, 5, 16, 15000]
         self._hps = self.hps._make(default)
 
     def get_tuple(self):
@@ -117,7 +117,7 @@ class Sampler(object):
             self.f_h5['train/{}/{}/lin'.format(speakerB, B_utt_id)][t_j:t_j + seg_len]
 
 class DataLoader(object):
-    def __init__(self, h5py_path, batch_size=8):
+    def __init__(self, h5py_path, batch_size=16):
         self.f_h5 = h5py.File(h5py_path)
         self.keys = list(self.f_h5.keys())
         self.index = 0
@@ -129,10 +129,13 @@ class DataLoader(object):
     def __next__(self):
         if self.index >= len(self.keys):
             self.index = 0
-        return self.f_h5['{}/X_i_t'.format(self.index)][0:self.batch_size],\
-            self.f_h5['{}/X_i_tk'.format(self.index)][0:self.batch_size],\
-            self.f_h5['{}/X_i_tk_prime'.format(self.index)][0:self.batch_size],\
-            self.f_h5['{}/X_j'.format(self.index)][0:self.batch_size]
+        key = self.keys[index]
+        data = (self.f_h5['{}/X_i_t/mel'.format(key)][0:self.batch_size],
+            self.f_h5['{}/X_i_tk/mel'.format(key)][0:self.batch_size],
+            self.f_h5['{}/X_i_tk_prime/mel'.format(key)][0:self.batch_size],
+            self.f_h5['{}/X_j/mel'.format(key)][0:self.batch_size])
+        self.index += 1
+        return data
 
 class Logger(object):
     def __init__(self, log_dir='./log'):
@@ -143,19 +146,19 @@ class Logger(object):
         self.writer.add_summary(summary, step)
 
 if __name__ == '__main__':
-    sampler = Sampler(h5_path='/storage/raw_feature/voice_conversion/tacotron_feature/train-clean-100.h5', \
-        speaker_sex_path='/storage/raw_feature/voice_conversion/train-clean-100-speaker-sex.txt', \
-        max_step=5,\
-        seg_len=128
-    )
+    #sampler = Sampler(h5_path='/storage/raw_feature/voice_conversion/tacotron_feature/train-clean-100.h5', \
+    #    speaker_sex_path='/storage/raw_feature/voice_conversion/train-clean-100-speaker-sex.txt', \
+    #    max_step=5,\
+    #    seg_len=128
+    #)
 
-    st = time.time()
-    for _ in range(500):
-        datas = sampler.sample()
-    et = time.time()
-    print(et - st)
-    #hps = Hps()
-    #hps.dump('./hps/v3.json')
+    #st = time.time()
+    #for _ in range(500):
+    #    datas = sampler.sample()
+    #et = time.time()
+    #print(et - st)
+    hps = Hps()
+    hps.dump('./hps/v4.json')
     #data_loader = DataLoader('/storage/raw_feature/voice_conversion/two_speaker_16_5.h5')
     #for _ in range(10):
     #    print(next(data_loader))

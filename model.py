@@ -51,7 +51,8 @@ class Discriminator(nn.Module):
         self.conv3 = nn.Conv1d(c_h, c_h*2, kernel_size=5, stride=2)
         self.conv4 = nn.Conv1d(c_h, 1, kernel_size=4)
 
-    def forward(self, x):
+    def forward(self, x1, x2):
+        x = torch.cat([x1, x2], dim=1)
         out = GLU(x, self.conv1, res=False)
         out = GLU(out, self.conv2, res=False)
         out = GLU(out, self.conv3, res=False)
