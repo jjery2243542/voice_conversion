@@ -129,7 +129,7 @@ class DataLoader(object):
     def __next__(self):
         if self.index >= len(self.keys):
             self.index = 0
-        key = self.keys[index]
+        key = self.keys[self.index]
         data = (self.f_h5['{}/X_i_t/mel'.format(key)][0:self.batch_size],
             self.f_h5['{}/X_i_tk/mel'.format(key)][0:self.batch_size],
             self.f_h5['{}/X_i_tk_prime/mel'.format(key)][0:self.batch_size],

@@ -8,8 +8,8 @@ import pickle
 from model import Encoder
 from model import Decoder
 from model import Discriminator
-from postprocess.utils import ispecgram
-from scipy.io import wavfile
+#from postprocess.utils import ispecgram
+#from scipy.io import wavfile
 import os 
 from utils import Hps
 from utils import DataLoader
@@ -23,14 +23,16 @@ def cal_mean_grad(net):
 
 def calculate_gradients_penalty(netD, real_data, fake_data):
     alpha = torch.rand(real_data.size(0))
+    alpha = alpha.view(real_data.size(0), 1, 1)
     alpha = alpha.cuda() if torch.cuda.is_available() else alpha
-
+    alpha = Variable(alpha)
     interpolates = alpha * real_data + (1 - alpha) * fake_data
-
-    interpolates = autograd.Variable(interpolates, requires_grad=True)
     disc_interpolates = netD(interpolates)
 
-    gradients = autograd.grad(outputs=disc_interpolates, inputs=interpolates, create_graph=True)[0]
+    gradients = torch.autograd.grad(
+        outputs=torch.mean(disc_interpolates), 
+        inputs=interpolates, 
+        create_graph=True)[0]
     gradients_penalty = (1. - torch.sqrt(1e-8 + torch.sum(gradients.view(gradients.size(0), -1)**2, dim=1))) ** 2
     gradients_penalty = torch.mean(gradients_penalty)
     return gradients_penalty
@@ -118,10 +120,8 @@ class Solver(object):
         # load hyperparams
         batch_size = self.hps.batch_size
         iterations = self.hps.iterations
-        g_iterations = self.hps.g_iterations
         max_grad_norm = self.hps.max_grad_norm
         alpha, beta, lambda_ = self.hps.alpha, self.hps.beta, self.hps.lambda_
-        margin = self.hps.margin
         for iteration in range(iterations):
             #===================== Train D =====================#
             X_i_t, X_i_tk, X_i_tk_prime, X_j = [self.to_var(x).permute(0, 2, 1) for x in next(self.data_loader)]
@@ -130,24 +130,26 @@ class Solver(object):
             Ec_i_tk = self.Encoder_c(X_i_tk)
             Ec_i_tk_prime = self.Encoder_c(X_i_tk_prime)
             Ec_j = self.Encoder_c(X_j)
-            same_val = torch.mean(self.Discriminator(Ec_i_t, Ec_i_tk))
-            diff_val = torch.mean(self.Discriminator(Ec_i_tk_prime, Ec_j))
-            gradients_penalty = calculate_gradients_penalty(self.Discriminator, same_val, diff_val)
+            same_pair = torch.cat([Ec_i_t, Ec_i_tk], dim=1)
+            diff_pair = torch.cat([Ec_i_tk_prime, Ec_j], dim=1)
+            same_val = torch.mean(self.Discriminator(same_pair))
+            diff_val = torch.mean(self.Discriminator(diff_pair))
+            gradients_penalty = calculate_gradients_penalty(self.Discriminator, same_pair, diff_pair)
             w_distance = torch.mean(same_val - diff_val)
-            D_loss = torch.mean(-beta * w_distance  + lambda_ * gradients_penalty)
+            D_loss = torch.mean(-beta * w_distance) #+ lambda_ * gradients_penalty)
             self.reset_grad()
             D_loss.backward()
             self.grad_clip([self.Discriminator])
-            D_opt.step()
+            self.D_opt.step()
             # print info
             info = {
                 'D_loss': D_loss.data[0],
-                'w_distance': w_distance[0],
+                'w_distance': w_distance.data[0],
                 'gradients_penalty': gradients_penalty.data[0],
             }
             slot_value = (iteration+1, iterations) + tuple([value for value in info.values()])
             print(
-                'D:[%06d/%06d], D_loss=%.3f, same_val=%.3f, diff_val=%.3f'
+                'D:[%06d/%06d], D_loss=%.3f, w_distance=%.3f, gp=%.3f'
                 % slot_value,
             )
             for tag, value in info.items():
@@ -167,8 +169,11 @@ class Solver(object):
             E_tk = torch.cat([Es_i_t, Ec_i_tk], dim=1)
             X_tilde = self.Decoder(E_tk)
             loss_rec = torch.mean(torch.abs(X_tilde - X_i_tk))
-            same_val = self.Discriminator(Ec_i_t, Ec_i_tk)
-            diff_val = self.Discriminator(Ec_i_tk_prime, Ec_j)
+            same_pair = torch.cat([Ec_i_t, Ec_i_tk], dim=1)
+            diff_pair = torch.cat([Ec_i_tk_prime, Ec_j], dim=1)
+            same_val = torch.mean(self.Discriminator(same_pair))
+            diff_val = torch.mean(self.Discriminator(diff_pair))
+            gradients_penalty = calculate_gradients_penalty(self.Discriminator, same_pair, diff_pair)
             w_distance = torch.mean(same_val - diff_val)
             G_loss = torch.mean(loss_rec + alpha * loss_sim + beta * w_distance)
             self.reset_grad()
@@ -194,10 +199,7 @@ if __name__ == '__main__':
     hps = Hps()
     hps.load('./hps/v4.json')
     hps_tuple = hps.get_tuple()
-    print('a')
     data_loader = DataLoader(
         '/storage/raw_feature/voice_conversion/tacotron_feature/batches_16_128_100000.h5',
     )
-    print('b')
     solver = Solver(hps_tuple, data_loader)
-    print('c')

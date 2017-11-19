@@ -44,15 +44,14 @@ def GLU(inp, layer, res=True):
     return H
 
 class Discriminator(nn.Module):
-    def __init__(self, c_in=64, c_h=256):
+    def __init__(self, c_in=128, c_h=256):
         super(Discriminator, self).__init__()
         self.conv1 = nn.Conv1d(c_in, c_h*2, kernel_size=5, stride=2)
         self.conv2 = nn.Conv1d(c_h, c_h*2, kernel_size=5, stride=2)
         self.conv3 = nn.Conv1d(c_h, c_h*2, kernel_size=5, stride=2)
         self.conv4 = nn.Conv1d(c_h, 1, kernel_size=4)
 
-    def forward(self, x1, x2):
-        x = torch.cat([x1, x2], dim=1)
+    def forward(self, x):
         out = GLU(x, self.conv1, res=False)
         out = GLU(out, self.conv2, res=False)
         out = GLU(out, self.conv3, res=False)

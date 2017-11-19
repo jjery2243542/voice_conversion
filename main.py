@@ -22,7 +22,7 @@ if __name__ == '__main__':
     hps.load('./hps/v4.json')
     hps_tuple = hps.get_tuple()
     data_loader = DataLoader(
-        '/nfs/Mazu/jjery2243542/voice_conversion/datasets/multi_sex_16_10.h5', 
+        '/nfs/Mazu/jjery2243542/voice_conversion/datasets/batches_16_128_100000.h5', 
     )
     solver = Solver(hps_tuple, data_loader)
     if args.load_model:
