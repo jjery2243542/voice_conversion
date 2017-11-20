@@ -10,8 +10,7 @@ import argparse
 import random
 import time
 import torch
-import tensorflow as tf
-
+from tensorboardX import SummaryWriter
 class Hps(object):
     def __init__(self):
         self.hps = namedtuple('hps', [
@@ -136,14 +135,13 @@ class DataLoader(object):
             self.f_h5['{}/X_j/mel'.format(key)][0:self.batch_size])
         self.index += 1
         return data
-
+    
 class Logger(object):
     def __init__(self, log_dir='./log'):
-        self.writer = tf.summary.FileWriter(log_dir)
+        self.writer = SummaryWriter(log_dir)
 
     def scalar_summary(self, tag, value, step):
-        summary = tf.Summary(value=[tf.Summary.Value(tag=tag, simple_value=value)])
-        self.writer.add_summary(summary, step)
+        self.writer.add_scalar(tag, value, step)
 
 if __name__ == '__main__':
     #sampler = Sampler(h5_path='/storage/raw_feature/voice_conversion/tacotron_feature/train-clean-100.h5', \
