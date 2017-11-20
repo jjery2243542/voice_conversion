@@ -6,5 +6,5 @@
     "max_grad_norm": 1,
     "max_step": 5,
     "batch_size": 16,
-    "iterations": 15000
+    "iterations": 150000
 }

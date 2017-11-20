@@ -13,7 +13,12 @@ def conv(inp, layer, pad=True, act=True):
     kernel_size = layer.kernel_size[0]
     # padding
     if pad:
-        inp = F.pad(torch.unsqueeze(inp, dim=3), pad=(0, 0, kernel_size//2, kernel_size//2), mode='reflect')
+        inp = F.pad(
+            torch.unsqueeze(inp, dim=3), 
+            pad=(0, 0, kernel_size//2, kernel_size//2), 
+            mode='constant', 
+            value=0.
+        )
         inp = inp.squeeze(dim=3)
     out = layer(inp)
     if act:
@@ -30,7 +35,7 @@ def GLU(inp, layer, res=True):
     kernel_size = layer.kernel_size[0]
     channels = layer.out_channels // 2 
     # padding
-    out = F.pad(inp.unsqueeze(dim=3), pad=(0, 0, kernel_size//2, kernel_size//2), mode='reflect')
+    out = F.pad(inp.unsqueeze(dim=3), pad=(0, 0, kernel_size//2, kernel_size//2), mode='constant', value=0.)
     out = out.squeeze(dim=3)
     # conv
     out = layer(out)

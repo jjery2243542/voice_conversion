@@ -65,8 +65,8 @@ class Solver(object):
         params = list(self.Encoder_s.parameters()) \
             + list(self.Encoder_c.parameters())\
             + list(self.Decoder.parameters())
-        self.G_opt = optim.RMSprop(params, lr=self.hps.lr)
-        self.D_opt = optim.RMSprop(self.Discriminator.parameters(), lr=self.hps.lr)
+        self.G_opt = optim.Adagrad(params, lr=self.hps.lr)
+        self.D_opt = optim.Adagrad(self.Discriminator.parameters(), lr=self.hps.lr)
 
     def to_var(self, x):
         x = Variable(torch.from_numpy(x), requires_grad=True)
@@ -123,37 +123,39 @@ class Solver(object):
         max_grad_norm = self.hps.max_grad_norm
         alpha, beta, lambda_ = self.hps.alpha, self.hps.beta, self.hps.lambda_
         for iteration in range(iterations):
-            #===================== Train D =====================#
-            X_i_t, X_i_tk, X_i_tk_prime, X_j = [self.to_var(x).permute(0, 2, 1) for x in next(self.data_loader)]
-            # encode
-            Ec_i_t = self.Encoder_c(X_i_t)
-            Ec_i_tk = self.Encoder_c(X_i_tk)
-            Ec_i_tk_prime = self.Encoder_c(X_i_tk_prime)
-            Ec_j = self.Encoder_c(X_j)
-            same_pair = torch.cat([Ec_i_t, Ec_i_tk], dim=1)
-            diff_pair = torch.cat([Ec_i_tk_prime, Ec_j], dim=1)
-            same_val = torch.mean(self.Discriminator(same_pair))
-            diff_val = torch.mean(self.Discriminator(diff_pair))
-            gradients_penalty = calculate_gradients_penalty(self.Discriminator, same_pair, diff_pair)
-            w_distance = torch.mean(same_val - diff_val)
-            D_loss = torch.mean(-beta * w_distance) #+ lambda_ * gradients_penalty)
-            self.reset_grad()
-            D_loss.backward()
-            self.grad_clip([self.Discriminator])
-            self.D_opt.step()
-            # print info
-            info = {
-                'D_loss': D_loss.data[0],
-                'w_distance': w_distance.data[0],
-                'gradients_penalty': gradients_penalty.data[0],
-            }
-            slot_value = (iteration+1, iterations) + tuple([value for value in info.values()])
-            print(
-                'D:[%06d/%06d], D_loss=%.3f, w_distance=%.3f, gp=%.3f'
-                % slot_value,
-            )
-            for tag, value in info.items():
-                self.logger.scalar_summary(tag, value, iteration + 1)
+            for j in range(5):
+                #===================== Train D =====================#
+                X_i_t, X_i_tk, X_i_tk_prime, X_j = \
+                    [self.to_var(x).permute(0, 2, 1) for x in next(self.data_loader)]
+                # encode
+                Ec_i_t = self.Encoder_c(X_i_t)
+                Ec_i_tk = self.Encoder_c(X_i_tk)
+                Ec_i_tk_prime = self.Encoder_c(X_i_tk_prime)
+                Ec_j = self.Encoder_c(X_j)
+                same_pair = torch.cat([Ec_i_t, Ec_i_tk], dim=1)
+                diff_pair = torch.cat([Ec_i_tk_prime, Ec_j], dim=1)
+                same_val = torch.mean(self.Discriminator(same_pair))
+                diff_val = torch.mean(self.Discriminator(diff_pair))
+                gradients_penalty = calculate_gradients_penalty(self.Discriminator, same_pair, diff_pair)
+                w_distance = same_val - diff_val
+                D_loss = -w_distance + lambda_ * gradients_penalty
+                self.reset_grad()
+                D_loss.backward()
+                self.grad_clip([self.Discriminator])
+                self.D_opt.step()
+                # print info
+                info = {
+                    'D_loss': D_loss.data[0],
+                    'w_distance': w_distance.data[0],
+                    'gradients_penalty': gradients_penalty.data[0],
+                }
+                slot_value = (j, iteration+1, iterations) + tuple([value for value in info.values()])
+                print(
+                    'D-%d:[%06d/%06d], D_loss=%.3f, w_distance=%.3f, gp=%.3f'
+                    % slot_value,
+                )
+                for tag, value in info.items():
+                    self.logger.scalar_summary(tag, value, iteration + 1)
             #===================== Train G =====================#
             X_i_t, X_i_tk, X_i_tk_prime, X_j = [self.to_var(x).permute(0, 2, 1) for x in next(self.data_loader)]
             # encode
@@ -174,8 +176,8 @@ class Solver(object):
             same_val = torch.mean(self.Discriminator(same_pair))
             diff_val = torch.mean(self.Discriminator(diff_pair))
             gradients_penalty = calculate_gradients_penalty(self.Discriminator, same_pair, diff_pair)
-            w_distance = torch.mean(same_val - diff_val)
-            G_loss = torch.mean(loss_rec + alpha * loss_sim + beta * w_distance)
+            w_distance = same_val - diff_val
+            G_loss = loss_rec + alpha * loss_sim + beta * w_distance
             self.reset_grad()
             G_loss.backward()
             self.grad_clip([self.Encoder_c, self.Encoder_s, self.Decoder])
@@ -200,6 +202,13 @@ if __name__ == '__main__':
     hps.load('./hps/v4.json')
     hps_tuple = hps.get_tuple()
     data_loader = DataLoader(
-        '/storage/raw_feature/voice_conversion/tacotron_feature/batches_16_128_100000.h5',
+        '/nfs/Mazu/jjery2243542/voice_conversion/datasets/batches_16_128_100000.h5',
     )
-    solver = Solver(hps_tuple, data_loader)
+    for _ in range(100000):
+        try:
+            a = next(data_loader)
+        except:
+            print(data_loader.index)
+            print(len(data_loader.keys))
+
+    #solver = Solver(hps_tuple, data_loader)
