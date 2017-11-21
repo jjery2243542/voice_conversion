@@ -14,9 +14,9 @@ def conv(inp, layer, pad=True, act=True):
     # padding
     if pad:
         inp = F.pad(
-            torch.unsqueeze(inp, dim=3), 
-            pad=(0, 0, kernel_size//2, kernel_size//2), 
-            mode='constant', 
+            torch.unsqueeze(inp, dim=3),
+            pad=(0, 0, kernel_size//2, kernel_size//2),
+            mode='constant',
             value=0.
         )
         inp = inp.squeeze(dim=3)
@@ -33,19 +33,18 @@ def upsample(x, scale_factor=2):
 
 def GLU(inp, layer, res=True):
     kernel_size = layer.kernel_size[0]
-    channels = layer.out_channels // 2 
+    channels = layer.out_channels // 2
     # padding
     out = F.pad(inp.unsqueeze(dim=3), pad=(0, 0, kernel_size//2, kernel_size//2), mode='constant', value=0.)
     out = out.squeeze(dim=3)
-    # conv
     out = layer(out)
     # gated
-    if res:
-        A = out[:, :channels, :] + inp
-    else:
-        A = out[:, :channels, :]
+    A = out[:, :channels, :]
     B = F.sigmoid(out[:, channels:, :])
-    H = A * B
+    if res:
+        H = A * B + inp
+    else:
+        H = A * B
     return H
 
 class Discriminator(nn.Module):
@@ -89,15 +88,17 @@ class Encoder(nn.Module):
     def __init__(self, c_in=80, c_h=256):
         super(Encoder, self).__init__()
         self.conv1 = nn.Conv1d(c_in, c_h, kernel_size=1)
-        self.conv2 = nn.Conv1d(c_h, 2 * c_h, kernel_size=11)
-        self.conv3 = nn.Conv1d(c_h, 2 * c_h, kernel_size=11)
-        self.conv4 = nn.Conv1d(c_h, 2 * c_h, kernel_size=11)
-        self.conv5 = nn.Conv1d(c_h, c_h, kernel_size=15, stride=2)
-        self.conv6 = nn.Conv1d(c_h // 2, c_h // 2, kernel_size=19, stride=2)
+        self.conv2 = nn.Conv1d(c_h, 2 * c_h, kernel_size=5)
+        self.conv3 = nn.Conv1d(c_h, 2 * c_h, kernel_size=5)
+        self.conv4 = nn.Conv1d(c_h, 2 * c_h, kernel_size=5)
+        self.conv5 = nn.Conv1d(c_h, c_h, kernel_size=7, stride=2)
+        self.conv6 = nn.Conv1d(c_h // 2, c_h // 2, kernel_size=7, stride=2)
 
     def forward(self, x):
         out = conv(x, self.conv1)
+        print(out.size())
         out = GLU(out, self.conv2)
+        print(out.size())
         out = GLU(out, self.conv3)
         out = GLU(out, self.conv4)
         out = GLU(out, self.conv5, res=False)
@@ -114,5 +115,5 @@ if __name__ == '__main__':
     e2 = E2(inp)
     e = torch.cat([e1, e2], dim=1)
     d = D(e)
-    c = C(e2)
+    c = C(torch.cat([e2,e2],dim=1))
     print(c.size())
