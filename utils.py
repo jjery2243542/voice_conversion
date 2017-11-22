@@ -148,6 +148,33 @@ class Sampler(object):
 #        self.index += 1
 #        return data
 
+class DataLoader(object):
+    def __init__(self, dataset, batch_size=16):
+        self.dataset = dataset
+        self.batch_size = batch_size
+        self.index = 0
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        batch = [[] for _ in range(4)]
+        print(self.index)
+        for i in range(self.batch_size):
+            sample = self.dataset[self.index + i]
+            for j in range(len(batch)):
+                batch[j].append(sample[j])
+
+        for j in range(len(batch)):
+            data = torch.stack([torch.from_numpy(data) for data in batch[j]], dim=0)
+            batch[j] = data
+
+        if self.index + 2 * self.batch_size >= len(self.dataset):
+            self.index = 0
+        else:
+            self.index += self.batch_size
+        return tuple(batch)
+
 class myDataset(data.Dataset):
     def __init__(self, h5_path, index_path, seg_len=128):
         self.h5 = h5py.File(h5_path, 'r')
@@ -183,14 +210,10 @@ if __name__ == '__main__':
     hps.dump('./hps/v4.json')
     dataset = myDataset('/storage/raw_feature/voice_conversion/tacotron_feature/train-clean-100.h5',\
             '/storage/librispeech_index/200k.json')
-    def merge(data_list):
-        [data[0] for data in data_list]
-    data_loader = data.DataLoader(
-            dataset=dataset,
-            batch_size=16,
-            shuffle=False)
+    data_loader = DataLoader(dataset)
     for i, batch in enumerate(data_loader):
-        print(batch)
+        for j in batch:
+            print(torch.sum(j), end=', ')
 
 
 
