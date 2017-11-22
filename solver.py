@@ -2,7 +2,6 @@ import torch
 from torch import optim
 from torch.autograd import Variable
 from torch import nn
-from torch import utils
 import torch.nn.functional as F
 import numpy as np
 import pickle
@@ -15,6 +14,7 @@ from model import Discriminator
 import os
 from utils import Hps
 from utils import Logger
+from utils import DataLoader
 
 def cal_mean_grad(net):
     grad = Variable(torch.FloatTensor([0])).cuda()
@@ -210,7 +210,7 @@ if __name__ == '__main__':
         '/storage/raw_feature/voice_conversion/tacotron_feature/train-clean-100.h5',
         '/storage/librispeech_index/2000k.json',
     )
-    data_loader = utils.data.DataLoader(dataset, batch_size=16, drop_last=True) 
+    data_loader = utils.DataLoader(dataset, batch_size=16, drop_last=True) 
     for data in data_loader:
         print(len(data))
 
