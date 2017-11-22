@@ -2,17 +2,18 @@ import torch
 from torch import optim
 from torch.autograd import Variable
 from torch import nn
+from torch import utils
 import torch.nn.functional as F
 import numpy as np
 import pickle
+from utils import myDataset
 from model import Encoder
 from model import Decoder
 from model import Discriminator
 #from postprocess.utils import ispecgram
 #from scipy.io import wavfile
-import os 
+import os
 from utils import Hps
-from utils import DataLoader
 from utils import Logger
 
 def cal_mean_grad(net):
@@ -30,8 +31,8 @@ def calculate_gradients_penalty(netD, real_data, fake_data):
     disc_interpolates = netD(interpolates)
 
     gradients = torch.autograd.grad(
-        outputs=torch.mean(disc_interpolates), 
-        inputs=interpolates, 
+        outputs=torch.mean(disc_interpolates),
+        inputs=interpolates,
         create_graph=True)[0]
     gradients_penalty = (1. - torch.sqrt(1e-8 + torch.sum(gradients.view(gradients.size(0), -1)**2, dim=1))) ** 2
     gradients_penalty = torch.mean(gradients_penalty)
@@ -116,14 +117,18 @@ class Solver(object):
         for net in net_list:
             torch.nn.utils.clip_grad_norm(net.parameters(), max_grad_norm)
 
-    def train(self, model_path):
+    def train(self, model_path, pretrain=True):
         # load hyperparams
         batch_size = self.hps.batch_size
+        D_iterations = self.hps.D_iterations
+        pretrain_iterations = self.hps.pretrain_iterations
         iterations = self.hps.iterations
         max_grad_norm = self.hps.max_grad_norm
         alpha, beta, lambda_ = self.hps.alpha, self.hps.beta, self.hps.lambda_
+        if pretrain:
+            beta, alpha, D_iterations = 0., 0., 0
         for iteration in range(iterations):
-            for j in range(5):
+            for j in range(D_iterations):
                 #===================== Train D =====================#
                 X_i_t, X_i_tk, X_i_tk_prime, X_j = \
                     [self.to_var(x).permute(0, 2, 1) for x in next(self.data_loader)]
@@ -141,7 +146,7 @@ class Solver(object):
                 D_loss = -w_distance + lambda_ * gradients_penalty
                 self.reset_grad()
                 D_loss.backward()
-                self.grad_clip([self.Discriminator])
+                #self.grad_clip([self.Discriminator])
                 self.D_opt.step()
                 # print info
                 info = {
@@ -180,7 +185,7 @@ class Solver(object):
             G_loss = loss_rec + alpha * loss_sim + beta * w_distance
             self.reset_grad()
             G_loss.backward()
-            self.grad_clip([self.Encoder_c, self.Encoder_s, self.Decoder])
+            #self.grad_clip([self.Encoder_c, self.Encoder_s, self.Decoder])
             self.G_opt.step()
             info = {
                 'loss_rec': loss_rec.data[0],
@@ -201,14 +206,12 @@ if __name__ == '__main__':
     hps = Hps()
     hps.load('./hps/v4.json')
     hps_tuple = hps.get_tuple()
-    data_loader = DataLoader(
-        '/nfs/Mazu/jjery2243542/voice_conversion/datasets/batches_16_128_100000.h5',
+    dataset = myDataset(
+        '/storage/raw_feature/voice_conversion/tacotron_feature/train-clean-100.h5',
+        '/storage/librispeech_index/2000k.json',
     )
-    for _ in range(100000):
-        try:
-            a = next(data_loader)
-        except:
-            print(data_loader.index)
-            print(len(data_loader.keys))
+    data_loader = utils.data.DataLoader(dataset, batch_size=16, drop_last=True) 
+    for data in data_loader:
+        print(len(data))
 
     #solver = Solver(hps_tuple, data_loader)
