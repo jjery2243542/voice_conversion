@@ -51,7 +51,8 @@ class Sampler(object):
         speaker_sex_path='/storage/raw_feature/voice_conversion/train-clean-100-speaker-sex.txt', 
         utt_len_path='/storage/raw_feature/voice_conversion/utterence_length.txt', 
         max_step=5, 
-        seg_len=128
+        seg_len=128,
+        n_speaker=4
     ):
         self.f_h5 = h5py.File(h5_path, 'r')
         self.max_step = max_step
@@ -59,7 +60,7 @@ class Sampler(object):
         self.read_sex_file(speaker_sex_path)
         self.utt2len = self.read_utt_len_file(utt_len_path)
         self.speakers = list(self.f_h5['train'].keys())
-        self.speaker_used = self.male_ids[:4] + self.female_ids[:4]
+        self.n_speaker = n_speaker
         self.speaker2utts = {speaker:list(self.f_h5['train/{}'.format(speaker)].keys()) \
                 for speaker in self.speakers}
         # remove too short utterence
@@ -104,8 +105,11 @@ class Sampler(object):
     def sample(self):
         seg_len = self.seg_len
         max_step = self.max_step
+        n_speaker = self.n_speaker
         # sample two speakers
-        speakerA, speakerB = random.sample(self.speaker_used, 2)
+        #speakerA, speakerB = random.sample(self.speaker_used, 2)
+        speakerA = random.sample(self.male_ids[:n_speaker], 1)[0]
+        speakerB = random.sample(self.female_ids[:n_speaker], 1)[0]
         A_utt_id, A_len = self.sample_utt(speakerA)
         B_utt_id, B_len = self.sample_utt(speakerB)
         # sample t and t^k 
