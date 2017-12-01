@@ -21,31 +21,31 @@ if __name__ == '__main__':
             samples = {
                 'X_i_t':{
                     'mel':np.empty(shape=(batch_size, seg_len, mel_band), dtype=np.float32), 
-                    'lin':np.empty(shape=(batch_size, seg_len, lin_band), dtype=np.float32)
+                    #'lin':np.empty(shape=(batch_size, seg_len, lin_band), dtype=np.float32)
                 },
                 'X_i_tk':{
                     'mel':np.empty(shape=(batch_size, seg_len, mel_band), dtype=np.float32), 
-                    'lin':np.empty(shape=(batch_size, seg_len, lin_band), dtype=np.float32)
+                    #'lin':np.empty(shape=(batch_size, seg_len, lin_band), dtype=np.float32)
                 },
                 'X_i_tk_prime':{
                     'mel':np.empty(shape=(batch_size, seg_len, mel_band), dtype=np.float32), 
-                    'lin':np.empty(shape=(batch_size, seg_len, lin_band), dtype=np.float32)
+                    #'lin':np.empty(shape=(batch_size, seg_len, lin_band), dtype=np.float32)
                 },
                 'X_j':{
                     'mel':np.empty(shape=(batch_size, seg_len, mel_band), dtype=np.float32), 
-                    'lin':np.empty(shape=(batch_size, seg_len, lin_band), dtype=np.float32)
+                    #'lin':np.empty(shape=(batch_size, seg_len, lin_band), dtype=np.float32)
                 },
             }
             for j in range(batch_size):
                 sample = sampler.sample()
                 samples['X_i_t']['mel'][j,:] = sample[0]
-                samples['X_i_t']['lin'][j,:] = sample[1]
+                #samples['X_i_t']['lin'][j,:] = sample[1]
                 samples['X_i_tk']['mel'][j,:] = sample[2]
-                samples['X_i_tk']['lin'][j,:] = sample[3]
+                #samples['X_i_tk']['lin'][j,:] = sample[3]
                 samples['X_i_tk_prime']['mel'][j,:] = sample[4]
-                samples['X_i_tk_prime']['lin'][j,:] = sample[5]
+                #samples['X_i_tk_prime']['lin'][j,:] = sample[5]
                 samples['X_j']['mel'][j,:] = sample[6]
-                samples['X_j']['lin'][j,:] = sample[7]
+                #samples['X_j']['lin'][j,:] = sample[7]
 
             for data_name in samples:
                 for data_type in samples[data_name]:

@@ -8,24 +8,28 @@ from model import Discriminator
 from utils import Hps
 from utils import DataLoader
 from utils import Logger
+from utils import myDataset
 from solver import Solver
 import argparse
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--train', default=True, action='store_true')
+    parser.add_argument('--test', default=False, action='store_true')
     parser.add_argument('--load_model', default=False, action='store_true')
-    parser.add_argument('-load_model_path', default='/nfs/Mazu/jjery2243542/voice_conversion/'
-    'model/pretrain.pkl-1300')
+    parser.add_argument('-load_model_path', default='/storage/model/voice_conversion/pretrain/'
+            'pretrain_model.pkl-6999')
     args = parser.parse_args()
     hps = Hps()
     hps.load('./hps/v4.json')
     hps_tuple = hps.get_tuple()
-    data_loader = DataLoader(
-        '/nfs/Mazu/jjery2243542/voice_conversion/datasets/batches_16_128_100000.h5', 
+    dataset = myDataset(
+        '/storage/raw_feature/voice_conversion/tacotron_feature/train-clean-100.h5',
+        '/storage/librispeech_index/2000k_4_4.json'
     )
+    data_loader = DataLoader(dataset, batch_size=hps_tuple.batch_size)
     solver = Solver(hps_tuple, data_loader)
     if args.load_model:
         solver.load_model(args.load_model_path)
     if args.train:
-        solver.train('/nfs/Mazu/jjery2243542/voice_conversion/model/model.pkl')
+        solver.train('/storage/model/voice_conversion/model.pkl', pretrain=True)

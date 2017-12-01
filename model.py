@@ -143,17 +143,14 @@ class Decoder(nn.Module):
     def __init__(self, c_in=1024, c_out=80, c_h=512):
         super(Decoder, self).__init__()
         self.conv1 = nn.Conv1d(c_in, 2*c_h, kernel_size=3)
-        self.conv2 = nn.Conv1d(c_h + c_in, 2*c_h, kernel_size=3)
-        self.conv3 = nn.Conv1d(c_h + c_in, 2*c_h, kernel_size=3)
-        self.conv4 = nn.Conv1d(c_h + c_in, 2*c_out, kernel_size=3)
+        self.conv2 = nn.Conv1d(c_h, 2*c_h, kernel_size=3)
+        self.conv3 = nn.Conv1d(c_h, 2*c_h, kernel_size=3)
+        self.conv4 = nn.Conv1d(c_h, 2*c_out, kernel_size=3)
 
     def forward(self, x):
         out = GLU(x, self.conv1, res=False)
-        out = torch.cat([out, x], dim=1)
-        out = GLU(out, self.conv2, res=False)
-        out = torch.cat([out, x], dim=1)
-        out = GLU(out, self.conv3, res=False)
-        out = torch.cat([out, x], dim=1)
+        out = GLU(out, self.conv2, res=True)
+        out = GLU(out, self.conv3, res=True)
         out = GLU(out, self.conv4, res=False)
         return out
 

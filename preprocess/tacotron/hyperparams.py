@@ -25,7 +25,7 @@ class Hyperparams:
     win_length = int(sr*frame_length) # samples This is dependent on the frame_length.
     n_mels = 80 # Number of Mel banks to generate
     power = 1.2 # Exponent for amplifying the predicted magnitude
-    n_iter = 30 # Number of inversion iterations 
+    n_iter = 100 # Number of inversion iterations 
     use_log_magnitude = True # if False, use magnitude
     
     # model

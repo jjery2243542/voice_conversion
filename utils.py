@@ -59,7 +59,7 @@ class Sampler(object):
         self.read_sex_file(speaker_sex_path)
         self.utt2len = self.read_utt_len_file(utt_len_path)
         self.speakers = list(self.f_h5['train'].keys())
-        self.speaker_used = self.speakers[:8]
+        self.speaker_used = self.male_ids[:4] + self.female_ids[:4]
         self.speaker2utts = {speaker:list(self.f_h5['train/{}'.format(speaker)].keys()) \
                 for speaker in self.speakers}
         # remove too short utterence
@@ -158,8 +158,7 @@ class DataLoader(object):
         return self
 
     def __next__(self):
-        batch = [[] for _ in range(4)]
-        print(self.index)
+        batch = [[] for _ in range(5)]
         for i in range(self.batch_size):
             sample = self.dataset[self.index + i]
             for j in range(len(batch)):
@@ -191,6 +190,7 @@ class myDataset(data.Dataset):
         data = []
         data.append(self.h5['train/{}/mel'.format(i)][t:t+seg_len])
         data.append(self.h5['train/{}/mel'.format(i)][t_k:t_k+seg_len])
+        data.append(self.h5['train/{}/lin'.format(i)][t_k:t_k+seg_len])
         data.append(self.h5['train/{}/mel'.format(i)][t_k_prime:t_k_prime+seg_len])
         data.append(self.h5['train/{}/mel'.format(j)][t_j:t_j+seg_len])
         return tuple(data)
