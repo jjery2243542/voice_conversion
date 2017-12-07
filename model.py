@@ -87,13 +87,14 @@ class Discriminator(nn.Module):
         super(Discriminator, self).__init__()
         self.conv1 = nn.Conv1d(c_in, c_h*2, kernel_size=3, stride=2)
         self.conv2 = nn.Conv1d(c_h, c_h*2, kernel_size=3, stride=2)
-        self.conv3 = nn.Conv1d(c_h, 1, kernel_size=128//4)
+        self.conv3 = nn.Conv1d(c_h, 1, kernel_size=64//4)
 
     def forward(self, x):
         out = GLU(x, self.conv1, res=False)
         out = GLU(out, self.conv2, res=False)
         out = self.conv3(out)
         out = out.view(out.size()[0], -1)
+        out = F.logsigmoid(out)
         return out
 
 class CBHG(nn.Module):
@@ -132,6 +133,7 @@ class CBHG(nn.Module):
         out = self.bn2(out)
         out = self.conv3(out)
         out = self.bn3(out)
+        print(out.size())
         out = out + x
         out = linear(out, self.linear1)
         out = highway(out, self.layers, self.gates, F.relu)
@@ -145,13 +147,17 @@ class Decoder(nn.Module):
         self.conv1 = nn.Conv1d(c_in, 2*c_h, kernel_size=3)
         self.conv2 = nn.Conv1d(c_h, 2*c_h, kernel_size=3)
         self.conv3 = nn.Conv1d(c_h, 2*c_h, kernel_size=3)
-        self.conv4 = nn.Conv1d(c_h, 2*c_out, kernel_size=3)
+        #self.conv4 = nn.Conv1d(c_h, 2*c_h, kernel_size=3)
+        self.linear = nn.Linear(c_h, c_out)
 
     def forward(self, x):
-        out = GLU(x, self.conv1, res=False)
-        out = GLU(out, self.conv2, res=True)
-        out = GLU(out, self.conv3, res=True)
-        out = GLU(out, self.conv4, res=False)
+        x = upsample(x)
+        out1 = GLU(x, self.conv1, res=False)
+        out2 = GLU(out1, self.conv2, res=True)
+        out3 = GLU(out2, self.conv3, res=True)
+        #out4 = GLU(out3, self.conv4, res=False)
+        #out4 = out4 + out3
+        out = linear(out3, self.linear)
         return out
 
 class Encoder(nn.Module):
@@ -161,10 +167,10 @@ class Encoder(nn.Module):
                 [nn.Conv1d(c_in, c_h1, kernel_size=k) for k in range(1, 15)]
             )
         self.conv2 = nn.Conv1d(len(self.conv1s)*c_h1 + c_in, c_h2*2, kernel_size=3)
-        self.conv3 = nn.Conv1d(c_h2, c_h2*2, kernel_size=3)
-        self.layers = nn.ModuleList([nn.Linear(c_h2, c_h2) for _ in range(4)])
-        self.gates = nn.ModuleList([nn.Linear(c_h2, c_h2) for _ in range(4)])
-        self.RNN = nn.GRU(input_size=c_h2, hidden_size=c_h3, num_layers=2, bidirectional=True)
+        self.conv3 = nn.Conv1d(c_h2, c_h2*2, kernel_size=3, stride=2)
+        self.layers = nn.ModuleList([nn.Linear(c_h2, c_h2) for _ in range(2)])
+        self.gates = nn.ModuleList([nn.Linear(c_h2, c_h2) for _ in range(2)])
+        self.RNN = nn.GRU(input_size=c_h2, hidden_size=c_h3, num_layers=1, bidirectional=True)
 
     def forward(self, x):
         outs = []
@@ -174,7 +180,7 @@ class Encoder(nn.Module):
         out = torch.cat(outs + [x], dim=1)
         out = F.leaky_relu(out)
         out = GLU(out, self.conv2, res=False)
-        out = GLU(out, self.conv3, res=True)
+        out = GLU(out, self.conv3, res=False)
         out = highway(out, self.layers, self.gates, F.leaky_relu)
         out_rnn = RNN(out, self.RNN)
         out = out + out_rnn
@@ -188,6 +194,7 @@ if __name__ == '__main__':
     inp = Variable(torch.randn(16, 80, 128)).cuda()
     e1 = E1(inp)
     e2 = E2(inp)
+    print(e2.size())
     e = torch.cat([e1, e2], dim=1)
     d = D(e)
     d2 = cbhg(d)
