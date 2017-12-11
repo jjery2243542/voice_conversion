@@ -131,7 +131,7 @@ class Sampler(object):
         # sample a segment from speakerB
         t_j = random.randint(0, B_len - seg_len)
         index_tuple = self.indexer(speaker_i=speakerA_idx, speaker_j=speakerB_idx,\
-                i0=f'{speakerA}/{A_utt_id_0}', i1=f'{speakerB}/{A_utt_id_1}',\
+                i0=f'{speakerA}/{A_utt_id_0}', i1=f'{speakerA}/{A_utt_id_1}',\
                 j=f'{speakerB}/{B_utt_id}', t=t, t_k=t_k, t_prime=t_prime, t_j=t_j)
         return index_tuple
 
@@ -159,6 +159,7 @@ class Sampler(object):
 class DataLoader(object):
     def __init__(self, dataset, batch_size=16):
         self.dataset = dataset
+        self.n_elements = len(self.dataset[0])
         self.batch_size = batch_size
         self.index = 0
 
@@ -166,41 +167,37 @@ class DataLoader(object):
         return self
 
     def __next__(self):
-        batch = [[] for _ in range(5)]
-        for i in range(self.batch_size):
-            sample = self.dataset[self.index + i]
-            for j in range(len(batch)):
-                batch[j].append(sample[j])
-
-        for j in range(len(batch)):
-            data = torch.stack([torch.from_numpy(data) for data in batch[j]], dim=0)
-            batch[j] = data
+        samples = [self.dataset[self.index + i] for i in range(self.batch_size)]
+        batch = [[s for s in sample] for sample in zip(*samples)]
+        batch_tensor = [torch.from_numpy(np.array(data)) for data in batch]
 
         if self.index + 2 * self.batch_size >= len(self.dataset):
             self.index = 0
         else:
             self.index += self.batch_size
-        return tuple(batch)
+        return tuple(batch_tensor)
 
 class myDataset(data.Dataset):
     def __init__(self, h5_path, index_path, seg_len=64):
         self.h5 = h5py.File(h5_path, 'r')
         with open(index_path) as f_index:
             self.indexes = json.load(f_index)
-
+        self.indexer = namedtuple('index', ['speaker_i', 'speaker_j', \
+                'i0', 'i1', 'j', 't', 't_k', 't_prime', 't_j'])
         self.seg_len = seg_len
 
     def __getitem__(self, i):
         index = self.indexes[i]
-        i, j,= index['i'], index['j'] 
-        t, t_k, t_k_prime, t_j = index['t'], index['t_k'], index['t_k_prime'], index['t_j']
+        index = self.indexer(**index)
+        speaker_i, speaker_j = index.speaker_i, index.speaker_j
+        i0, i1, j = index.i0, index.i1, index.j
+        t, t_k, t_prime, t_j = index.t, index.t_k, index.t_prime, index.t_j
         seg_len = self.seg_len
-        data = []
-        data.append(self.h5['train/{}/mel'.format(i)][t:t+seg_len])
-        data.append(self.h5['train/{}/mel'.format(i)][t_k:t_k+seg_len])
-        data.append(self.h5['train/{}/lin'.format(i)][t_k:t_k+seg_len])
-        data.append(self.h5['train/{}/mel'.format(i)][t_k_prime:t_k_prime+seg_len])
-        data.append(self.h5['train/{}/mel'.format(j)][t_j:t_j+seg_len])
+        data = [speaker_i, speaker_j]
+        data.append(self.h5[f'train/{i0}/lin'][t:t+seg_len])
+        data.append(self.h5[f'train/{i0}/lin'][t_k:t_k+seg_len])
+        data.append(self.h5[f'train/{i1}/lin'][t_prime:t_prime+seg_len])
+        data.append(self.h5[f'train/{j}/lin'][t_j:t_j+seg_len])
         return tuple(data)
 
     def __len__(self):
@@ -214,17 +211,14 @@ class Logger(object):
         self.writer.add_scalar(tag, value, step)
 
 if __name__ == '__main__':
-    #hps = Hps()
-    #hps.dump('./hps/v4.json')
-    #dataset = myDataset('/storage/raw_feature/voice_conversion/tacotron_feature/train-clean-100.h5',\
-    #        '/storage/librispeech_index/200k.json')
-    #data_loader = DataLoader(dataset)
-    #for i, batch in enumerate(data_loader):
-    #    for j in batch:
-    #        print(torch.sum(j), end=', ')
-    sampler = Sampler()
-    for i in range(100):
-        print(sampler.sample())
-
-
-
+    hps = Hps()
+    hps.dump('./hps/v4.json')
+    dataset = myDataset('/storage/raw_feature/voice_conversion/vctk/vctk.h5',\
+            '/storage/raw_feature/voice_conversion/vctk/64_513_2000k.json')
+    data_loader = DataLoader(dataset)
+    for i, batch in enumerate(data_loader):
+        for data in batch:
+            print(data.size())
+    #sampler = Sampler()
+    #for i in range(100):
+    #    print(sampler.sample())
