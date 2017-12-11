@@ -47,25 +47,28 @@ class Hps(object):
 class Sampler(object):
     def __init__(
         self, 
-        h5_path, 
-        speaker_sex_path='/storage/raw_feature/voice_conversion/train-clean-100-speaker-sex.txt', 
-        utt_len_path='/storage/raw_feature/voice_conversion/utterence_length.txt', 
+        h5_path='/storage/raw_feature/voice_conversion/vctk/vctk.h5', 
+        speaker_info_path='/storage/raw_feature/voice_conversion/vctk/speaker-info.txt', 
+        utt_len_path='/storage/raw_feature/voice_conversion/vctk/vctk_length.txt', 
         max_step=5, 
-        seg_len=128,
-        n_speaker=4
+        seg_len=64,
+        n_speaker=8,
     ):
         self.f_h5 = h5py.File(h5_path, 'r')
         self.max_step = max_step
         self.seg_len = seg_len
-        self.read_sex_file(speaker_sex_path)
+        #self.read_sex_file(speaker_sex_path)
+        self.read_vctk_speaker_file(speaker_info_path)
         self.utt2len = self.read_utt_len_file(utt_len_path)
         self.speakers = list(self.f_h5['train'].keys())
         self.n_speaker = n_speaker
+        self.speaker_used = self.female_ids[:n_speaker // 2] + self.male_ids[:n_speaker // 2]
         self.speaker2utts = {speaker:list(self.f_h5['train/{}'.format(speaker)].keys()) \
                 for speaker in self.speakers}
         # remove too short utterence
         self.rm_too_short_utt()
-        self.indexer = namedtuple('index', ['i', 'j', 't', 't_k', 't_k_prime', 't_j'])
+        self.indexer = namedtuple('index', ['speaker_i', 'speaker_j', \
+                'i0', 'i1', 'j', 't', 't_k', 't_prime', 't_j'])
 
     def read_utt_len_file(self, utt_len_path):
         with open(utt_len_path, 'r') as f:
@@ -83,7 +86,18 @@ class Sampler(object):
             if length < limit:
                 self.speaker2utts[speaker].remove(utt_id)
 
-    def read_sex_file(self, speaker_sex_path):
+    def read_vctk_speaker_file(self, speaker_info_path):
+        self.female_ids, self.male_ids = [], []
+        with open(speaker_info_path, 'r') as f:
+            lines = f.readlines()
+            infos = [line.strip().split() for line in lines[1:]]
+            for info in infos:
+                if info[2] == 'F':
+                    self.female_ids.append(info[0])
+                else:
+                    self.male_ids.append(info[0])
+            
+    def read_libre_sex_file(self, speaker_sex_path):
         with open(speaker_sex_path, 'r') as f:
             # Female
             f.readline()
@@ -92,11 +106,11 @@ class Sampler(object):
             f.readline()
             self.male_ids = f.readline().strip().split()
 
-    def sample_utt(self, speaker_id):
+    def sample_utt(self, speaker_id, n_samples=1):
         # sample an utterence
-        utt_id = self.rand(self.speaker2utts[speaker_id])
-        length = self.f_h5['train/{}/{}/mel'.format(speaker_id, utt_id)].shape[0]
-        return utt_id, length
+        utt_ids = random.sample(self.speaker2utts[speaker_id], n_samples)
+        lengths = [self.f_h5[f'train/{speaker_id}/{utt_id}/mel'].shape[0] for utt_id in utt_ids]
+        return [(utt_id, length) for utt_id, length in zip(utt_ids, lengths)]
 
     def rand(self, l):
         rand_idx = random.randint(0, len(l) - 1)
@@ -105,31 +119,21 @@ class Sampler(object):
     def sample(self):
         seg_len = self.seg_len
         max_step = self.max_step
-        n_speaker = self.n_speaker
         # sample two speakers
-        #speakerA, speakerB = random.sample(self.speaker_used, 2)
-        speakerA = random.sample(self.male_ids[:n_speaker], 1)[0]
-        speakerB = random.sample(self.female_ids[:n_speaker], 1)[0]
-        A_utt_id, A_len = self.sample_utt(speakerA)
-        B_utt_id, B_len = self.sample_utt(speakerB)
+        speakerA_idx, speakerB_idx = random.sample(range(len(self.speaker_used)), 2)
+        speakerA, speakerB = self.speaker_used[speakerA_idx], self.speaker_used[speakerB_idx]
+        (A_utt_id_0, A_len_0), (A_utt_id_1, A_len_1) = self.sample_utt(speakerA, 2)
+        (B_utt_id, B_len), = self.sample_utt(speakerB, 1)
         # sample t and t^k 
-        t = random.randint(0, A_len - 2 * seg_len)  
-        t_k = random.randint(t + seg_len, min(A_len - seg_len, t + max_step * seg_len))
-        t_k_prime = random.randint(t + seg_len, min(A_len - seg_len, t + max_step * seg_len))
+        t = random.randint(0, A_len_0 - 2 * seg_len)  
+        t_k = random.randint(t + seg_len, min(A_len_0 - seg_len, t + max_step * seg_len))
+        t_prime = random.randint(0, A_len_1 - seg_len)
         # sample a segment from speakerB
         t_j = random.randint(0, B_len - seg_len)
-        index_tuple = self.indexer(i='{}/{}'.format(speakerA, A_utt_id), \
-                j='{}/{}'.format(speakerB, B_utt_id), \
-                t=t, t_k=t_k, t_k_prime=t_k_prime, t_j=t_j)
+        index_tuple = self.indexer(speaker_i=speakerA_idx, speaker_j=speakerB_idx,\
+                i0=f'{speakerA}/{A_utt_id_0}', i1=f'{speakerB}/{A_utt_id_1}',\
+                j=f'{speakerB}/{B_utt_id}', t=t, t_k=t_k, t_prime=t_prime, t_j=t_j)
         return index_tuple
-        #return self.f_h5['train/{}/{}/mel'.format(speakerA, A_utt_id)][t:t + seg_len], \
-        #    self.f_h5['train/{}/{}/lin'.format(speakerA, A_utt_id)][t:t + seg_len],\
-        #    self.f_h5['train/{}/{}/mel'.format(speakerA, A_utt_id)][t_k:t_k + seg_len],\
-        #    self.f_h5['train/{}/{}/lin'.format(speakerA, A_utt_id)][t_k:t_k + seg_len],\
-        #    self.f_h5['train/{}/{}/mel'.format(speakerA, A_utt_id)][t_k_prime:t_k_prime + seg_len],\
-        #    self.f_h5['train/{}/{}/lin'.format(speakerA, A_utt_id)][t_k_prime:t_k_prime + seg_len],\
-        #    self.f_h5['train/{}/{}/mel'.format(speakerB, B_utt_id)][t_j:t_j + seg_len],\
-        #    self.f_h5['train/{}/{}/lin'.format(speakerB, B_utt_id)][t_j:t_j + seg_len]
 
 #class DataLoader(object):
 #    def __init__(self, h5py_path, batch_size=16):
@@ -179,7 +183,7 @@ class DataLoader(object):
         return tuple(batch)
 
 class myDataset(data.Dataset):
-    def __init__(self, h5_path, index_path, seg_len=128):
+    def __init__(self, h5_path, index_path, seg_len=64):
         self.h5 = h5py.File(h5_path, 'r')
         with open(index_path) as f_index:
             self.indexes = json.load(f_index)
@@ -210,14 +214,17 @@ class Logger(object):
         self.writer.add_scalar(tag, value, step)
 
 if __name__ == '__main__':
-    hps = Hps()
-    hps.dump('./hps/v4.json')
-    dataset = myDataset('/storage/raw_feature/voice_conversion/tacotron_feature/train-clean-100.h5',\
-            '/storage/librispeech_index/200k.json')
-    data_loader = DataLoader(dataset)
-    for i, batch in enumerate(data_loader):
-        for j in batch:
-            print(torch.sum(j), end=', ')
+    #hps = Hps()
+    #hps.dump('./hps/v4.json')
+    #dataset = myDataset('/storage/raw_feature/voice_conversion/tacotron_feature/train-clean-100.h5',\
+    #        '/storage/librispeech_index/200k.json')
+    #data_loader = DataLoader(dataset)
+    #for i, batch in enumerate(data_loader):
+    #    for j in batch:
+    #        print(torch.sum(j), end=', ')
+    sampler = Sampler()
+    for i in range(100):
+        print(sampler.sample())
 
 
 
