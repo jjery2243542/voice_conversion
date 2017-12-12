@@ -82,6 +82,14 @@ def linear(inp, layer):
     out = out_permuted.permute(0, 2, 1)
     return out
 
+def append_emb(inp, layer, expand_size, output):
+    emb = layer(inp)
+    emb = emb.unsqueeze(dim=2)
+    emb_expand = emb.expand(emb.size(0), emb.size(1), expand_size)
+    output = torch.cat([output, emb_expand], dim=1)
+    return output
+
+
 class Discriminator(nn.Module):
     def __init__(self, c_in=1024, c_h=256):
         super(Discriminator, self).__init__()
@@ -143,25 +151,31 @@ class CBHG(nn.Module):
         return out
 
 class Decoder(nn.Module):
-    def __init__(self, c_in=1024, c_out=513, c_h=512):
+    def __init__(self, c_in=512, c_out=513, c_h=512, c_a=8, emb_size=128):
         super(Decoder, self).__init__()
-        self.conv1 = nn.Conv1d(c_in, c_h, kernel_size=3)
-        self.conv2 = nn.Conv1d(c_h, c_h, kernel_size=3)
-        self.conv3 = nn.Conv1d(c_h, c_h, kernel_size=3)
-        self.conv4 = nn.Conv1d(c_h, c_h, kernel_size=3)
-        self.linear = nn.Linear(c_h, c_out)
+        self.conv1 = nn.Conv1d(c_in + emb_size, c_h, kernel_size=3)
+        self.conv2 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=3)
+        self.conv3 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=3)
+        self.conv4 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=3)
+        self.emb = nn.Embedding(c_a, emb_size)
+        self.linear = nn.Linear(c_h + emb_size, c_out)
 
-    def forward(self, x):
-        x = upsample(x)
-        out1 = pad_layer(x, self.conv1)
+    def forward(self, x, c):
+        inp = append_emb(c, self.emb, x.size(2), x)
+        inp = upsample(inp)
+        out1 = pad_layer(inp, self.conv1)
         out1 = F.leaky_relu(out1)
+        out1 = append_emb(c, self.emb, out1.size(2), out1)
         out1 = upsample(out1)
         out2 = pad_layer(out1, self.conv2)
         out2 = F.leaky_relu(out2)
+        out2 = append_emb(c, self.emb, out2.size(2), out2)
         out3 = pad_layer(out2, self.conv3)
         out3 = F.leaky_relu(out3)
+        out3 = append_emb(c, self.emb, out3.size(2), out3)
         out4 = pad_layer(out3, self.conv4)
         out4 = F.leaky_relu(out4)
+        out4 = append_emb(c, self.emb, out4.size(2), out4)
         out = out4 + out2
         out = linear(out, self.linear)
         return out
@@ -208,10 +222,9 @@ if __name__ == '__main__':
     D = Decoder().cuda()
     C = Discriminator().cuda()
     cbhg = CBHG().cuda()
-    inp = Variable(torch.randn(16, 513, 128)).cuda()
+    inp = Variable(torch.randn(16, 513, 64)).cuda()
     e1 = E1(inp)
     e2 = E2(inp)
-    print(e2.size())
-    e = torch.cat([e1, e2], dim=1)
-    d = D(e)
+    c = Variable(torch.from_numpy(np.random.randint(8, size=(16)))).cuda()
+    d = D(e1, c)
     c = C(torch.cat([e2,e2],dim=1))
