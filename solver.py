@@ -44,34 +44,29 @@ class Solver(object):
         self.data_loader = data_loader
         self.model_kept = []
         self.max_keep = 10
-        self.Encoder_s = None
-        self.Encoder_c = None
+        self.Encoder = None
         self.Decoder = None
         self.Discriminator = None
-        self.postnet = None
+        #self.postnet = None
         self.G_opt = None
         self.D_opt = None
         self.build_model()
         self.logger = Logger(log_dir)
 
     def build_model(self):
-        self.Encoder_s = Encoder()
-        self.Encoder_c = Encoder()
+        self.Encoder = Encoder()
         self.Decoder = Decoder()
         self.Discriminator = Discriminator()
-        self.postnet = CBHG()
+        #self.postnet = CBHG()
         if torch.cuda.is_available():
-            self.Encoder_s.cuda()
-            self.Encoder_c.cuda()
+            self.Encoder.cuda()
             self.Decoder.cuda()
             self.Discriminator.cuda()
-            self.postnet.cuda()
-        params = list(self.Encoder_s.parameters()) \
-            + list(self.Encoder_c.parameters())\
-            + list(self.Decoder.parameters())\
-            + list(self.postnet.parameters())
-        self.G_opt = optim.Adam(params, lr=self.hps.lr, betas=(0, 0.9))
-        self.D_opt = optim.Adam(self.Discriminator.parameters(), lr=self.hps.lr, betas=(0, 0.9))
+            #self.postnet.cuda()
+        params = list(self.Encoder.parameters()) + list(self.Decoder.parameters())
+            #+ list(self.postnet.parameters())
+        self.G_opt = optim.Adam(params, lr=self.hps.lr, betas=(0.5, 0.9))
+        self.D_opt = optim.Adam(self.Discriminator.parameters(), lr=self.hps.lr, betas=(0.5, 0.9))
 
     def to_var(self, x):
         x = Variable(x, requires_grad=True)
@@ -80,18 +75,14 @@ class Solver(object):
     def save_model(self, model_path, iteration, enc_only=True):
         if not enc_only:
             all_model = {
-                'encoder_s': self.Encoder_s.state_dict(),
-                'encoder_c': self.Encoder_c.state_dict(),
+                'encoder': self.Encoder.state_dict(),
                 'decoder': self.Decoder.state_dict(),
                 'discriminator': self.Discriminator.state_dict(),
-                'postnet': self.postnet.state_dict(),
             }
         else:
             all_model = {
-                'encoder_s': self.Encoder_s.state_dict(),
-                'encoder_c': self.Encoder_c.state_dict(),
+                'encoder': self.Encoder.state_dict(),
                 'decoder': self.Decoder.state_dict(),
-                'postnet': self.postnet.state_dict(),
             }
         new_model_path = '{}-{}'.format(model_path, iteration)
         with open(new_model_path, 'wb') as f_out:
@@ -103,20 +94,16 @@ class Solver(object):
             self.model_kept.pop(0)
 
     def reset_grad(self):
-        self.Encoder_s.zero_grad()
-        self.Encoder_c.zero_grad()
+        self.Encoder.zero_grad()
         self.Decoder.zero_grad()
         self.Discriminator.zero_grad()
-        self.postnet.zero_grad()
 
     def load_model(self, model_path, enc_only=True):
         print('load model from {}'.format(model_path))
         with open(model_path, 'rb') as f_in:
             all_model = torch.load(f_in)
-            self.Encoder_s.load_state_dict(all_model['encoder_s'])
-            self.Encoder_c.load_state_dict(all_model['encoder_c'])
+            self.Encoder.load_state_dict(all_model['encoder'])
             self.Decoder.load_state_dict(all_model['decoder'])
-            self.postnet.load_state_dict(all_model['postnet'])
             if not enc_only:
                 self.Discriminator.load_state_dict(all_model['discriminator'])
 
@@ -125,15 +112,20 @@ class Solver(object):
         for net in net_list:
             torch.nn.utils.clip_grad_norm(net.parameters(), max_grad_norm)
 
-    def test_step(self, X_s, X_c):
-        X_s = self.to_var(X_s).permute(0, 2, 1)
-        X_c = self.to_var(X_c).permute(0, 2, 1)
-        E_s = self.Encoder_s(X_s)
-        E_c = self.Encoder_c(X_c)
-        E = torch.cat([E_s, E_c], dim=1)
-        X_tilde = self.Decoder(E)
-        X_lin = self.postnet(X_tilde)
-        return X_lin.data.cpu().numpy()
+    #def test_step(self, X_s, X_c):
+    #    X_s = self.to_var(X_s).permute(0, 2, 1)
+    #    X_c = self.to_var(X_c).permute(0, 2, 1)
+    #    E_s = self.Encoder_s(X_s)
+    #    E_c = self.Encoder_c(X_c)
+    #    Ec_len = E_c.size(2)
+    #    Es_len = E_s.size(2)
+    #    if Ec_len < Es_len:
+    #        E = torch.cat([E_s[:,:,:Ec_len], E_c], dim=1)
+    #    else:
+    #        E = torch.cat([E_s, E_c[:,:,:Es_len]], dim=1)
+    #    X_tilde = self.Decoder(E)
+    #    X_lin = self.postnet(X_tilde)
+    #    return X_lin.data.cpu().numpy()
 
     def train(self, model_path, pretrain=True):
         # load hyperparams
@@ -149,15 +141,15 @@ class Solver(object):
         for iteration in range(iterations):
             for j in range(D_iterations):
                 #===================== Train D =====================#
-                X_i_t, X_i_tk, X_lin_i_tk, X_i_tk_prime, X_j = \
+                _, _, X_i_t, X_i_tk, X_i_prime, X_j = \
                     [self.to_var(x).permute(0, 2, 1) for x in next(self.data_loader)]
                 # encode
-                Ec_i_t = self.Encoder_c(X_i_t)
-                Ec_i_tk = self.Encoder_c(X_i_tk)
-                Ec_i_tk_prime = self.Encoder_c(X_i_tk_prime)
-                Ec_j = self.Encoder_c(X_j)
+                E_i_t = self.Encoder(X_i_t)
+                E_i_tk = self.Encoder(X_i_tk)
+                E_i_prime = self.Encoder(X_i_prime)
+                E_j = self.Encoder(X_j)
                 same_pair = torch.cat([Ec_i_t, Ec_i_tk], dim=1)
-                diff_pair = torch.cat([Ec_i_tk_prime, Ec_j], dim=1)
+                diff_pair = torch.cat([Ec_i_prime, Ec_j], dim=1)
                 same_val = self.Discriminator(same_pair)
                 diff_val = self.Discriminator(diff_pair)
                 gradients_penalty = calculate_gradients_penalty(self.Discriminator, same_pair, diff_pair)
@@ -181,46 +173,33 @@ class Solver(object):
                 for tag, value in info.items():
                     self.logger.scalar_summary(tag, value, iteration + 1)
             #===================== Train G =====================#
-            X_i_t, X_i_tk, X_lin_i_tk, X_i_tk_prime, X_j = \
+            c_i, c_j, X_i_t, X_i_tk, X_i_prime, X_j = \
                 [self.to_var(x).permute(0, 2, 1) for x in next(self.data_loader)]
             # encode
-            Es_i_t = self.Encoder_s(X_i_t)
-            Es_i_tk = self.Encoder_s(X_i_tk)
-            Ec_i_t = self.Encoder_c(X_i_t)
-            Ec_j = self.Encoder_c(X_j)
-            Ec_i_tk = self.Encoder_c(X_i_tk)
-            Ec_i_tk_prime = self.Encoder_c(X_i_tk_prime)
-            # similarity loss
-            loss_sim = torch.mean((Es_i_t - Es_i_tk) ** 2)
+            E_i_t = self.Encoder(X_i_t)
+            E_i_tk = self.Encoder(X_i_tk)
+            E_i_prime = self.Encoder(X_i_prime)
+            E_j = self.Encoder(X_j)
             # reconstruction
-            E_tk = torch.cat([Es_i_t, Ec_i_tk], dim=1)
-            X_tilde = self.Decoder(E_tk)
-            loss_rec_mel = torch.mean(torch.abs(X_tilde - X_i_tk))
-            X_lin_tilde = self.postnet(X_tilde)
-            loss_rec_lin = torch.mean(torch.abs(X_lin_tilde - X_lin_i_tk))
-            X_lin = self.postnet(X_i_tk)
-            loss_lin = torch.mean(torch.abs(X_lin - X_lin_i_tk))
-            loss_rec = 0.5 * loss_rec_mel + 0.5 * loss_rec_lin
-            same_pair = torch.cat([Ec_i_t, Ec_i_tk], dim=1)
-            diff_pair = torch.cat([Ec_i_tk_prime, Ec_j], dim=1)
+            X_tilde = self.Decoder(E_i_t, c_i)
+            loss_rec = torch.mean(torch.abs(X_tilde - X_i_t))
+            same_pair = torch.cat([E_i_t, E_i_tk], dim=1)
+            diff_pair = torch.cat([E_i_prime, E_j], dim=1)
             same_val = self.Discriminator(same_pair)
             diff_val = self.Discriminator(diff_pair)
             w_distance = torch.mean(same_val - diff_val)
-            G_loss = loss_rec + alpha * loss_sim + beta * w_distance
+            G_loss = loss_ + alpha * w_distance
             self.reset_grad()
             G_loss.backward()
-            self.grad_clip([self.Encoder_c, self.Encoder_s, self.Decoder, self.postnet])
+            self.grad_clip([self.Encoder, self.Decoder])
             self.G_opt.step()
             info = {
-                'loss_rec_mel': loss_rec_mel.data[0],
-                'loss_rec_lin': loss_rec_lin.data[0],
-                'loss_sim': loss_sim.data[0],
+                'loss_rec': loss_rec.data[0],
                 'G_w_distance': w_distance.data[0],
             }
             slot_value = (iteration+1, iterations) + tuple([value for value in info.values()])
             print(
-                'G:[%06d/%06d], loss_rec_mel=%.3f, loss_rec_lin=%.3f, '
-                'loss_sim=%.3f, w_distance=%.3f'
+                'G:[%06d/%06d], loss_rec=%.3f, w_distance=%.3f'
                 % slot_value,
             )
             for tag, value in info.items():
@@ -230,14 +209,11 @@ class Solver(object):
 
 if __name__ == '__main__':
     hps = Hps()
+    hps = Hps()
     hps.load('./hps/v4.json')
     hps_tuple = hps.get_tuple()
-    dataset = myDataset(
-        '/storage/raw_feature/voice_conversion/tacotron_feature/train-clean-100.h5',
-        '/storage/librispeech_index/2000k.json',
-    )
-    data_loader = utils.DataLoader(dataset, batch_size=16, drop_last=True) 
-    for data in data_loader:
-        print(len(data))
+    dataset = myDataset('/storage/raw_feature/voice_conversion/vctk/vctk.h5',\
+            '/storage/raw_feature/voice_conversion/vctk/64_513_2000k.json')
+    data_loader = DataLoader(dataset)
 
-    #solver = Solver(hps_tuple, data_loader)
+    solver = Solver(hps_tuple, data_loader)
