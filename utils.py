@@ -12,13 +12,12 @@ import time
 import torch
 from torch.utils import data
 from tensorboardX import SummaryWriter
-
+from torch.autograd import Variable
 class Hps(object):
     def __init__(self):
         self.hps = namedtuple('hps', [
             'lr',
             'alpha',
-            'beta',
             'lambda_',
             'max_grad_norm',
             'max_step',
@@ -29,7 +28,7 @@ class Hps(object):
             'iterations',
             ]
         )
-        default = [5e-4, 1, 0.5, 10, 1, 5, 128, 5, 16, 10000, 15000]
+        default = [5e-4, 0.1, 10, 1, 5, 64, 4, 16, 10000, 15000]
         self._hps = self.hps._make(default)
 
     def get_tuple(self):
@@ -216,9 +215,9 @@ if __name__ == '__main__':
     dataset = myDataset('/storage/raw_feature/voice_conversion/vctk/vctk.h5',\
             '/storage/raw_feature/voice_conversion/vctk/64_513_2000k.json')
     data_loader = DataLoader(dataset)
-    for i, batch in enumerate(data_loader):
-        for data in batch:
-            print(data.size())
+    #for i, batch in enumerate(data_loader):
+    #    print(Variable(batch[0]))
+    #    exit(0)
     #sampler = Sampler()
     #for i in range(100):
     #    print(sampler.sample())

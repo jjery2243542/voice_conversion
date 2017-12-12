@@ -5,7 +5,7 @@ import os
 import glob
 import re
 from collections import defaultdict
-from utils import get_spectrograms
+from tacotron.utils import get_spectrograms
 
 '''DEPRECATE
 def sort_key(x):

@@ -23,13 +23,13 @@ if __name__ == '__main__':
     hps = Hps()
     hps.load('./hps/v4.json')
     hps_tuple = hps.get_tuple()
-    dataset = myDataset(
-        '/storage/raw_feature/voice_conversion/tacotron_feature/train-clean-100.h5',
-        '/storage/librispeech_index/2000k_4_4.json'
-    )
-    data_loader = DataLoader(dataset, batch_size=hps_tuple.batch_size)
+    dataset = myDataset('/storage/raw_feature/voice_conversion/vctk/vctk.h5',\
+            '/storage/raw_feature/voice_conversion/vctk/64_513_2000k.json',
+            seg_len=hps_tuple.seg_len)
+    data_loader = DataLoader(dataset)
+
     solver = Solver(hps_tuple, data_loader)
     if args.load_model:
         solver.load_model(args.load_model_path)
     if args.train:
-        solver.train('/storage/model/voice_conversion/model.pkl', pretrain=True)
+        solver.train('/storage/model/voice_conversion/pretrain_model.pkl', pretrain=True)

@@ -68,8 +68,8 @@ class Solver(object):
         self.G_opt = optim.Adam(params, lr=self.hps.lr, betas=(0.5, 0.9))
         self.D_opt = optim.Adam(self.Discriminator.parameters(), lr=self.hps.lr, betas=(0.5, 0.9))
 
-    def to_var(self, x):
-        x = Variable(x, requires_grad=True)
+    def to_var(self, x, requires_grad=True):
+        x = Variable(x, requires_grad=requires_grad)
         return x.cuda() if torch.cuda.is_available() else x
 
     def save_model(self, model_path, iteration, enc_only=True):
@@ -112,20 +112,11 @@ class Solver(object):
         for net in net_list:
             torch.nn.utils.clip_grad_norm(net.parameters(), max_grad_norm)
 
-    #def test_step(self, X_s, X_c):
-    #    X_s = self.to_var(X_s).permute(0, 2, 1)
-    #    X_c = self.to_var(X_c).permute(0, 2, 1)
-    #    E_s = self.Encoder_s(X_s)
-    #    E_c = self.Encoder_c(X_c)
-    #    Ec_len = E_c.size(2)
-    #    Es_len = E_s.size(2)
-    #    if Ec_len < Es_len:
-    #        E = torch.cat([E_s[:,:,:Ec_len], E_c], dim=1)
-    #    else:
-    #        E = torch.cat([E_s, E_c[:,:,:Es_len]], dim=1)
-    #    X_tilde = self.Decoder(E)
-    #    X_lin = self.postnet(X_tilde)
-    #    return X_lin.data.cpu().numpy()
+    def test_step(self, X, c):
+        X = self.to_var(X).permute(0, 2, 1)
+        E = self.Encoder(X)
+        X_tilde = self.Decoder(E, c)
+        return X_tilde.data.cpu().numpy()
 
     def train(self, model_path, pretrain=True):
         # load hyperparams
@@ -134,15 +125,16 @@ class Solver(object):
         pretrain_iterations = self.hps.pretrain_iterations
         iterations = self.hps.iterations
         max_grad_norm = self.hps.max_grad_norm
-        alpha, beta, lambda_ = self.hps.alpha, self.hps.beta, self.hps.lambda_
+        alpha, lambda_ = self.hps.alpha, self.hps.lambda_
         if pretrain:
-            beta, alpha, D_iterations = 0., 0., 0
+            alpha, D_iterations = 0., 0
             iterations = pretrain_iterations
         for iteration in range(iterations):
             for j in range(D_iterations):
                 #===================== Train D =====================#
-                _, _, X_i_t, X_i_tk, X_i_prime, X_j = \
-                    [self.to_var(x).permute(0, 2, 1) for x in next(self.data_loader)]
+                data = next(self.data_loader)
+                X_i_t, X_i_tk, X_i_prime, X_j = \
+                        [self.to_var(x).permute(0, 2, 1) for x in data[2:]]
                 # encode
                 E_i_t = self.Encoder(X_i_t)
                 E_i_tk = self.Encoder(X_i_tk)
@@ -173,8 +165,10 @@ class Solver(object):
                 for tag, value in info.items():
                     self.logger.scalar_summary(tag, value, iteration + 1)
             #===================== Train G =====================#
-            c_i, c_j, X_i_t, X_i_tk, X_i_prime, X_j = \
-                [self.to_var(x).permute(0, 2, 1) for x in next(self.data_loader)]
+            data = next(self.data_loader)
+            c_i, c_j = [self.to_var(x, requires_grad=False) for x in data[:2]]
+            X_i_t, X_i_tk, X_i_prime, X_j = \
+                    [self.to_var(x).permute(0, 2, 1) for x in data[2:]]
             # encode
             E_i_t = self.Encoder(X_i_t)
             E_i_tk = self.Encoder(X_i_tk)
@@ -188,7 +182,7 @@ class Solver(object):
             same_val = self.Discriminator(same_pair)
             diff_val = self.Discriminator(diff_pair)
             w_distance = torch.mean(same_val - diff_val)
-            G_loss = loss_ + alpha * w_distance
+            G_loss = loss_rec + alpha * w_distance
             self.reset_grad()
             G_loss.backward()
             self.grad_clip([self.Encoder, self.Decoder])
@@ -208,7 +202,6 @@ class Solver(object):
                 self.save_model(model_path, iteration)
 
 if __name__ == '__main__':
-    hps = Hps()
     hps = Hps()
     hps.load('./hps/v4.json')
     hps_tuple = hps.get_tuple()

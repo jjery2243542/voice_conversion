@@ -27,7 +27,6 @@ def get_spectrograms(sound_file):
     '''
     # Loading sound file
     y, sr = librosa.load(sound_file, sr=hp.sr) # or set sr to hp.sr.
-    
     # stft. D: (1+n_fft//2, T)
     D = librosa.stft(y=y,
                      n_fft=hp.n_fft, 
