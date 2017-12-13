@@ -17,7 +17,7 @@ def pad_layer(inp, layer):
     inp = F.pad(
         torch.unsqueeze(inp, dim=3),
         pad=pad,
-        mode='constant',
+        mode='reflect',
         value=0.)
     inp = inp.squeeze(dim=3)
     out = layer(inp)
@@ -93,18 +93,18 @@ def append_emb(inp, layer, expand_size, output):
 class Discriminator(nn.Module):
     def __init__(self, c_in=1024, c_h=256):
         super(Discriminator, self).__init__()
-        self.conv1 = nn.Conv1d(c_in, c_h, kernel_size=3, stride=2)
-        self.conv2 = nn.Conv1d(c_h, c_h, kernel_size=3, stride=2)
-        self.conv3 = nn.Conv1d(c_h, 1, kernel_size=32//4)
+        self.conv1 = nn.Conv1d(c_in, c_h, kernel_size=5, stride=2)
+        self.conv2 = nn.Conv1d(c_h, c_h, kernel_size=5, stride=2)
+        self.conv3 = nn.Conv1d(c_h, 1, kernel_size=16//4)
 
     def forward(self, x):
         out = pad_layer(x, self.conv1)
         out = F.leaky_relu(out)
         out = pad_layer(out, self.conv2)
         out = F.leaky_relu(out)
-        out = pad_layer(out, self.conv3)
+        out = self.conv3(out)
         out = out.view(out.size()[0], -1)
-        out = F.logsigmoid(out)
+        #out = F.logsigmoid(out)
         return out
 
 class CBHG(nn.Module):
@@ -153,10 +153,10 @@ class CBHG(nn.Module):
 class Decoder(nn.Module):
     def __init__(self, c_in=512, c_out=513, c_h=512, c_a=8, emb_size=128):
         super(Decoder, self).__init__()
-        self.conv1 = nn.Conv1d(c_in + emb_size, c_h, kernel_size=3)
-        self.conv2 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=3)
-        self.conv3 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=3)
-        self.conv4 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=3)
+        self.conv1 = nn.Conv1d(c_in + emb_size, c_h, kernel_size=5)
+        self.conv2 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=5)
+        self.conv3 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=5)
+        self.conv4 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=5)
         self.emb = nn.Embedding(c_a, emb_size)
         self.linear = nn.Linear(c_h + emb_size, c_out)
 
@@ -181,14 +181,14 @@ class Decoder(nn.Module):
         return out
 
 class Encoder(nn.Module):
-    def __init__(self, c_in=513, c_h1=64, c_h2=512, c_h3=128):
+    def __init__(self, c_in=513, c_h1=128, c_h2=512, c_h3=128):
         super(Encoder, self).__init__()
         self.conv1s = nn.ModuleList(
                 [nn.Conv1d(c_in, c_h1, kernel_size=k) for k in range(1, 16)]
             )
         self.conv2 = nn.Conv1d(len(self.conv1s)*c_h1 + c_in, c_h2, kernel_size=3)
-        self.conv3 = nn.Conv1d(c_h2, c_h2, kernel_size=3, stride=2)
-        self.conv4 = nn.Conv1d(c_h2, c_h2, kernel_size=3, stride=2)
+        self.conv3 = nn.Conv1d(c_h2, c_h2, kernel_size=5, stride=2)
+        self.conv4 = nn.Conv1d(c_h2, c_h2, kernel_size=5, stride=2)
         self.dense1 = nn.Linear(c_h2, c_h2)
         self.dense2 = nn.Linear(c_h2, c_h2)
         self.RNN = nn.GRU(input_size=c_h2, hidden_size=c_h3, num_layers=1, bidirectional=True)
@@ -225,6 +225,8 @@ if __name__ == '__main__':
     inp = Variable(torch.randn(16, 513, 64)).cuda()
     e1 = E1(inp)
     e2 = E2(inp)
+    print(e1.size())
     c = Variable(torch.from_numpy(np.random.randint(8, size=(16)))).cuda()
     d = D(e1, c)
     c = C(torch.cat([e2,e2],dim=1))
+    print(c.size())
