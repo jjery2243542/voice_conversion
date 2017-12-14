@@ -25,9 +25,6 @@ if __name__ == '__main__':
     hps = Hps()
     hps.load('./hps/v4.json')
     hps_tuple = hps.get_tuple()
-    dataset = myDataset('/storage/raw_feature/voice_conversion/vctk/vctk.h5',\
-            '/storage/raw_feature/voice_conversion/vctk/128_513_2000k.json',
-            seg_len=hps_tuple.seg_len)
     dataset = myDataset(args.dataset_path,
             args.index_path,
             seg_len=hps_tuple.seg_len)
