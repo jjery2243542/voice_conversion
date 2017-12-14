@@ -54,9 +54,10 @@ class Solver(object):
         self.logger = Logger(log_dir)
 
     def build_model(self):
-        self.Encoder = Encoder()
-        self.Decoder = Decoder()
-        self.Discriminator = Discriminator()
+        ns = self.hps.ns
+        self.Encoder = Encoder(ns=ns)
+        self.Decoder = Decoder(ns=ns)
+        self.Discriminator = Discriminator(ns=ns)
         #self.postnet = CBHG()
         if torch.cuda.is_available():
             self.Encoder.cuda()
@@ -126,9 +127,11 @@ class Solver(object):
         iterations = self.hps.iterations
         max_grad_norm = self.hps.max_grad_norm
         alpha, lambda_ = self.hps.alpha, self.hps.lambda_
+        flag = 'train'
         if pretrain:
             alpha, D_iterations = 0., 0
             iterations = pretrain_iterations
+            flag = 'pretrain'
         for iteration in range(iterations):
             for j in range(D_iterations):
                 #===================== Train D =====================#
@@ -140,22 +143,22 @@ class Solver(object):
                 E_i_tk = self.Encoder(X_i_tk)
                 E_i_prime = self.Encoder(X_i_prime)
                 E_j = self.Encoder(X_j)
-                same_pair = torch.cat([Ec_i_t, Ec_i_tk], dim=1)
-                diff_pair = torch.cat([Ec_i_prime, Ec_j], dim=1)
+                same_pair = torch.cat([E_i_t, E_i_tk], dim=1)
+                diff_pair = torch.cat([E_i_prime, E_j], dim=1)
                 same_val = self.Discriminator(same_pair)
                 diff_val = self.Discriminator(diff_pair)
                 gradients_penalty = calculate_gradients_penalty(self.Discriminator, same_pair, diff_pair)
                 w_distance = torch.mean(same_val - diff_val)
-                D_loss = -w_distance + lambda_ * gradients_penalty
+                D_loss = -alpha * w_distance + lambda_ * gradients_penalty
                 self.reset_grad()
                 D_loss.backward()
                 self.grad_clip([self.Discriminator])
                 self.D_opt.step()
                 # print info
                 info = {
-                    'D_loss': D_loss.data[0],
-                    'D_w_distance': w_distance.data[0],
-                    'gradients_penalty': gradients_penalty.data[0],
+                    f'{flag}/D_loss': D_loss.data[0],
+                    f'{flag}/D_w_distance': w_distance.data[0],
+                    f'{flag}/gradients_penalty': gradients_penalty.data[0],
                 }
                 slot_value = (j, iteration+1, iterations) + tuple([value for value in info.values()])
                 print(
@@ -188,8 +191,8 @@ class Solver(object):
             self.grad_clip([self.Encoder, self.Decoder])
             self.G_opt.step()
             info = {
-                'loss_rec': loss_rec.data[0],
-                'G_w_distance': w_distance.data[0],
+                f'{flag}/loss_rec': loss_rec.data[0],
+                f'{flag}/G_w_distance': w_distance.data[0],
             }
             slot_value = (iteration+1, iterations) + tuple([value for value in info.values()])
             print(

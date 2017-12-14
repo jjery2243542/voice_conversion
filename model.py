@@ -91,17 +91,18 @@ def append_emb(inp, layer, expand_size, output):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, c_in=1024, c_h=256):
+    def __init__(self, c_in=1024, c_h=256, ns=0.2):
         super(Discriminator, self).__init__()
+        self.ns = ns
         self.conv1 = nn.Conv1d(c_in, c_h, kernel_size=5, stride=2)
         self.conv2 = nn.Conv1d(c_h, c_h, kernel_size=5, stride=2)
         self.conv3 = nn.Conv1d(c_h, 1, kernel_size=16//4)
 
     def forward(self, x):
         out = pad_layer(x, self.conv1)
-        out = F.leaky_relu(out)
+        out = F.leaky_relu(out, negative_slope=self.ns)
         out = pad_layer(out, self.conv2)
-        out = F.leaky_relu(out)
+        out = F.leaky_relu(out, negative_slope=self.ns)
         out = self.conv3(out)
         out = out.view(out.size()[0], -1)
         #out = F.logsigmoid(out)
@@ -151,12 +152,14 @@ class CBHG(nn.Module):
         return out
 
 class Decoder(nn.Module):
-    def __init__(self, c_in=512, c_out=513, c_h=512, c_a=8, emb_size=128):
+    def __init__(self, c_in=512, c_out=513, c_h=512, c_a=8, emb_size=128, ns=0.2):
         super(Decoder, self).__init__()
+        self.ns = ns
         self.conv1 = nn.Conv1d(c_in + emb_size, c_h, kernel_size=5)
         self.conv2 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=5)
         self.conv3 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=5)
         self.conv4 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=5)
+        self.conv5 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=5)
         self.emb = nn.Embedding(c_a, emb_size)
         self.linear = nn.Linear(c_h + emb_size, c_out)
 
@@ -164,34 +167,42 @@ class Decoder(nn.Module):
         inp = append_emb(c, self.emb, x.size(2), x)
         inp = upsample(inp)
         out1 = pad_layer(inp, self.conv1)
-        out1 = F.leaky_relu(out1)
+        out1 = F.leaky_relu(out1, negative_slope=self.ns)
         out1 = append_emb(c, self.emb, out1.size(2), out1)
         out1 = upsample(out1)
         out2 = pad_layer(out1, self.conv2)
-        out2 = F.leaky_relu(out2)
+        out2 = F.leaky_relu(out2, negative_slope=self.ns)
         out2 = append_emb(c, self.emb, out2.size(2), out2)
+        out2 = upsample(out2)
         out3 = pad_layer(out2, self.conv3)
-        out3 = F.leaky_relu(out3)
+        out3 = F.leaky_relu(out3, negative_slope=self.ns)
         out3 = append_emb(c, self.emb, out3.size(2), out3)
         out4 = pad_layer(out3, self.conv4)
-        out4 = F.leaky_relu(out4)
+        out4 = F.leaky_relu(out4, negative_slope=self.ns)
         out4 = append_emb(c, self.emb, out4.size(2), out4)
-        out = out4 + out2
+        out5 = pad_layer(out4, self.conv5)
+        out5 = F.leaky_relu(out5, negative_slope=self.ns)
+        out5 = append_emb(c, self.emb, out5.size(2), out5)
+        out = out5 + out2
         out = linear(out, self.linear)
         return out
 
 class Encoder(nn.Module):
-    def __init__(self, c_in=513, c_h1=128, c_h2=512, c_h3=128):
+    def __init__(self, c_in=513, c_h1=128, c_h2=512, c_h3=256, ns=0.2):
         super(Encoder, self).__init__()
+        self.ns = ns
         self.conv1s = nn.ModuleList(
                 [nn.Conv1d(c_in, c_h1, kernel_size=k) for k in range(1, 16)]
             )
         self.conv2 = nn.Conv1d(len(self.conv1s)*c_h1 + c_in, c_h2, kernel_size=3)
         self.conv3 = nn.Conv1d(c_h2, c_h2, kernel_size=5, stride=2)
         self.conv4 = nn.Conv1d(c_h2, c_h2, kernel_size=5, stride=2)
+        self.conv5 = nn.Conv1d(c_h2, c_h2, kernel_size=5, stride=2)
         self.dense1 = nn.Linear(c_h2, c_h2)
         self.dense2 = nn.Linear(c_h2, c_h2)
-        self.RNN = nn.GRU(input_size=c_h2, hidden_size=c_h3, num_layers=1, bidirectional=True)
+        self.dense3 = nn.Linear(c_h2, c_h2)
+        self.dense4 = nn.Linear(c_h2, c_h2)
+        self.RNN = nn.GRU(input_size=c_h2, hidden_size=c_h3, num_layers=2, bidirectional=True)
         self.linear = nn.Linear(c_h2 + 2*c_h3, c_h2)
 
     def forward(self, x):
@@ -200,18 +211,25 @@ class Encoder(nn.Module):
             out = pad_layer(x, l)
             outs.append(out)
         out = torch.cat(outs + [x], dim=1)
-        out = F.leaky_relu(out)
+        out = F.leaky_relu(out, negative_slope=self.ns)
         out = pad_layer(out, self.conv2)
-        out = F.leaky_relu(out)
+        out = F.leaky_relu(out, negative_slope=self.ns)
         out = pad_layer(out, self.conv3)
-        out = F.leaky_relu(out)
+        out = F.leaky_relu(out, negative_slope=self.ns)
         out = pad_layer(out, self.conv4)
-        out = F.leaky_relu(out)
-        out_dense = linear(out, self.dense1)
-        out_dense = F.leaky_relu(out_dense)
-        out_dense = linear(out_dense, self.dense2)
-        out_dense = F.leaky_relu(out_dense)
-        out = out + out_dense
+        out = F.leaky_relu(out, negative_slope=self.ns)
+        out = pad_layer(out, self.conv5)
+        out = F.leaky_relu(out, negative_slope=self.ns)
+        out_dense1 = linear(out, self.dense1)
+        out_dense1 = F.leaky_relu(out_dense1, negative_slope=self.ns)
+        out_dense2 = linear(out_dense1, self.dense2)
+        out_dense2 = F.leaky_relu(out_dense2, negative_slope=self.ns)
+        out_dense2 = out_dense2 + out
+        out_dense3 = linear(out_dense2, self.dense3)
+        out_dense3 = F.leaky_relu(out_dense3, negative_slope=self.ns)
+        out_dense4 = linear(out_dense3, self.dense4)
+        out_dense4 = F.leaky_relu(out_dense4, negative_slope=self.ns)
+        out = out_dense4 + out_dense2
         out_rnn = RNN(out, self.RNN)
         out = torch.cat([out, out_rnn], dim=1)
         out = linear(out, self.linear) 
@@ -222,11 +240,12 @@ if __name__ == '__main__':
     D = Decoder().cuda()
     C = Discriminator().cuda()
     cbhg = CBHG().cuda()
-    inp = Variable(torch.randn(16, 513, 64)).cuda()
+    inp = Variable(torch.randn(16, 513, 128)).cuda()
     e1 = E1(inp)
     e2 = E2(inp)
     print(e1.size())
     c = Variable(torch.from_numpy(np.random.randint(8, size=(16)))).cuda()
     d = D(e1, c)
+    print(d.size())
     c = C(torch.cat([e2,e2],dim=1))
     print(c.size())

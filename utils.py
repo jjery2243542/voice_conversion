@@ -19,6 +19,7 @@ class Hps(object):
             'lr',
             'alpha',
             'lambda_',
+            'ns', 
             'max_grad_norm',
             'max_step',
             'seg_len',
@@ -28,7 +29,7 @@ class Hps(object):
             'iterations',
             ]
         )
-        default = [5e-4, 0.1, 10, 1, 5, 64, 4, 16, 10000, 15000]
+        default = [5e-4, 0.001, 10, 0.2, 1, 5, 128, 4, 32, 20000, 50000]
         self._hps = self.hps._make(default)
 
     def get_tuple(self):

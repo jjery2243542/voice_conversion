@@ -16,15 +16,15 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--train', default=True, action='store_true')
     parser.add_argument('--test', default=False, action='store_true')
-    parser.add_argument('--load_model', default=False, action='store_true')
-    parser.add_argument('-load_model_path', default='/storage/model/voice_conversion/pretrain/'
-            'pretrain_model.pkl-6999')
+    parser.add_argument('--load_model', default=True, action='store_true')
+    parser.add_argument('-load_model_path', default='/storage/model/voice_conversion/'
+            'pretrain_model.pkl-19999')
     args = parser.parse_args()
     hps = Hps()
     hps.load('./hps/v4.json')
     hps_tuple = hps.get_tuple()
     dataset = myDataset('/storage/raw_feature/voice_conversion/vctk/vctk.h5',\
-            '/storage/raw_feature/voice_conversion/vctk/64_513_2000k.json',
+            '/storage/raw_feature/voice_conversion/vctk/128_513_2000k.json',
             seg_len=hps_tuple.seg_len)
     data_loader = DataLoader(dataset)
 
@@ -32,4 +32,5 @@ if __name__ == '__main__':
     if args.load_model:
         solver.load_model(args.load_model_path)
     if args.train:
-        solver.train('/storage/model/voice_conversion/pretrain_model.pkl', pretrain=True)
+        #solver.train('/storage/model/voice_conversion/pretrain_model.pkl', pretrain=True)
+        solver.train('/storage/model/voice_conversion/model.pkl', pretrain=False)
