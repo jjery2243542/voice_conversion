@@ -3,3 +3,4 @@
 ## TODO
 - Patch GAN loss
 - Dropout on Discriminator
+- Linearly increase alpha
