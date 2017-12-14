@@ -1,13 +1,5 @@
-# voice_conversion
-## note
-- Content: speaker
-- Pose: content
-- Classifier learn to discriminate speaker.
+# voice conversion via disentangle context representation
 
 ## TODO
-- Preprocess batches with prime
-- test code
-- Finish post processing code
-- Add another GAN to guide the output
-- Decoder add true residual
-- Decoder activation turn to sigmoid
+- Patch GAN loss
+- Dropout on Discriminator
