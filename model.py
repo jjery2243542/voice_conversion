@@ -91,25 +91,32 @@ def append_emb(inp, layer, expand_size, output):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, c_in=1024, c_h=256, ns=0.2):
+    def __init__(self, c_in=1024, c_h=256, ns=0.2, p=0.3):
         super(Discriminator, self).__init__()
         self.ns = ns
         self.conv1 = nn.Conv1d(c_in, c_h, kernel_size=5)
         self.conv2 = nn.Conv1d(c_h, c_h, kernel_size=5, stride=2)
         self.conv3 = nn.Conv1d(c_h, c_h, kernel_size=5, stride=2)
         self.conv4 = nn.Conv1d(c_h, 1, kernel_size=16//4)
+        self.drop1 = nn.Dropout(p=p)
+        self.drop2 = nn.Dropout(p=p)
+        self.drop3 = nn.Dropout(p=p)
 
     def forward(self, x):
         out = pad_layer(x, self.conv1)
+        out = self.drop1(out)
         out = F.leaky_relu(out, negative_slope=self.ns)
         out = pad_layer(out, self.conv2)
+        out = self.drop2(out)
         out = F.leaky_relu(out, negative_slope=self.ns)
         out = pad_layer(out, self.conv3)
+        out = self.drop3(out)
         out = F.leaky_relu(out, negative_slope=self.ns)
         out = self.conv4(out)
         out = out.view(out.size()[0], -1)
-        #out = F.sigmoid(out)
-        return out
+        prob = F.sigmoid(out)
+        log_prob = F.logsigmoid(out)
+        return log_prob, prob
 
 class CBHG(nn.Module):
     def __init__(self, c_in=80, c_out=1025):

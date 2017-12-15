@@ -14,7 +14,7 @@ import os
 from utils import Hps
 from utils import Logger
 from utils import DataLoader
-from preprocess.tacotron import utils
+#from preprocess.tacotron import utils
 
 def cal_mean_grad(net):
     grad = Variable(torch.FloatTensor([0])).cuda()
@@ -146,11 +146,14 @@ class Solver(object):
                 E_j = self.Encoder(X_j)
                 same_pair = torch.cat([E_i_t, E_i_tk], dim=1)
                 diff_pair = torch.cat([E_i_prime, E_j], dim=1)
-                same_val = self.Discriminator(same_pair)
-                diff_val = self.Discriminator(diff_pair)
-                gradients_penalty = calculate_gradients_penalty(self.Discriminator, same_pair, diff_pair)
-                w_distance = torch.mean(same_val - diff_val)
-                D_loss = -current_alpha * w_distance + lambda_ * gradients_penalty
+                same_val, same_prob = self.Discriminator(same_pair)
+                diff_val, diff_prob = self.Discriminator(diff_pair)
+                mean_same_prob = torch.mean(same_prob)
+                mean_diff_prob = torch.mean(diff_prob)
+                #gradients_penalty = calculate_gradients_penalty(self.Discriminator, same_pair, diff_pair)
+                #w_distance = torch.mean(same_val - diff_val)
+                #D_loss = -current_alpha * w_distance + lambda_ * gradients_penalty
+                D_loss = -current_alpha * torch.mean(same_val - diff_val)
                 self.reset_grad()
                 D_loss.backward()
                 self.grad_clip([self.Discriminator])
@@ -158,12 +161,14 @@ class Solver(object):
                 # print info
                 info = {
                     f'{flag}/D_loss': D_loss.data[0],
-                    f'{flag}/D_w_distance': w_distance.data[0],
-                    f'{flag}/gradients_penalty': gradients_penalty.data[0],
+                    f'{flag}/same_prob': mean_same_prob.data[0], 
+                    f'{flag}/diff_prob': mean_diff_prob.data[0], 
+                    #f'{flag}/D_w_distance': w_distance.data[0],
+                    #f'{flag}/gradients_penalty': gradients_penalty.data[0],
                 }
                 slot_value = (j, iteration+1, iterations) + tuple([value for value in info.values()])
                 print(
-                    'D-%d:[%06d/%06d], D_loss=%.3f, w_distance=%.3f, gp=%.3f'
+                    'D-%d:[%06d/%06d], D_loss=%.3f, same_prob=%.3f, diff_prob=%.3f'
                     % slot_value,
                 )
                 for tag, value in info.items():
@@ -183,22 +188,28 @@ class Solver(object):
             loss_rec = torch.mean(torch.abs(X_tilde - X_i_t))
             same_pair = torch.cat([E_i_t, E_i_tk], dim=1)
             diff_pair = torch.cat([E_i_prime, E_j], dim=1)
-            same_val = self.Discriminator(same_pair)
-            diff_val = self.Discriminator(diff_pair)
-            w_distance = torch.mean(same_val - diff_val)
-            G_loss = loss_rec + current_alpha * w_distance
+            same_val, same_prob = self.Discriminator(same_pair)
+            diff_val, diff_prob = self.Discriminator(diff_pair)
+            mean_same_prob = torch.mean(same_prob)
+            mean_diff_prob = torch.mean(diff_prob)
+            #w_distance = torch.mean(same_val - diff_val)
+            loss_adv = 0.5 * torch.mean((same_val - diff_val) ** 2) 
+            G_loss = loss_rec + current_alpha * loss_adv
             self.reset_grad()
             G_loss.backward()
             self.grad_clip([self.Encoder, self.Decoder])
             self.G_opt.step()
             info = {
                 f'{flag}/loss_rec': loss_rec.data[0],
-                f'{flag}/G_w_distance': w_distance.data[0],
+                f'{flag}/loss_adv': loss_adv.data[0],
+                f'{flag}/same_prob': mean_same_prob.data[0],
+                f'{flag}/diff_prob': mean_same_prob.data[0],
                 f'{flag}/alpha': current_alpha, 
             }
             slot_value = (iteration+1, iterations) + tuple([value for value in info.values()])
             print(
-                'G:[%06d/%06d], loss_rec=%.3f, w_distance=%.3f, alpha=%.2e'
+                'G:[%06d/%06d], loss_rec=%.3f, loss_adv=%.3f, '
+                'same_prob=%.3f, diff_prob=%.3f, alpha=%.2e'
                 % slot_value,
             )
             for tag, value in info.items():
