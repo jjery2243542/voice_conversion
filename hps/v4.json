@@ -1,6 +1,6 @@
 {
     "lr": 0.0002,
-    "alpha": 0.01,
+    "alpha": 0.0001,
     "lambda_": 10,
     "ns": 0.01,
     "max_grad_norm": 1,
@@ -9,5 +9,5 @@
     "D_iterations": 4,
     "batch_size": 32,
     "pretrain_iterations": 20000,
-    "iterations": 50000
+    "iterations": 100000
 }

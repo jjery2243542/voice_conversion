@@ -14,10 +14,10 @@ import argparse
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--pretrain', default=True, action='store_true')
+    parser.add_argument('--pretrain', default=False, action='store_true')
     parser.add_argument('--train', default=True, action='store_true')
     parser.add_argument('--test', default=False, action='store_true')
-    parser.add_argument('--load_model', default=True, action='store_true')
+    parser.add_argument('--load_model', default=False, action='store_true')
     parser.add_argument('-load_model_path', default='/storage/model/voice_conversion/'
             'pretrain_model.pkl-19999')
     parser.add_argument('-dataset_path', default='/storage/raw_feature/voice_conversion/vctk/vctk.h5')

@@ -94,18 +94,21 @@ class Discriminator(nn.Module):
     def __init__(self, c_in=1024, c_h=256, ns=0.2):
         super(Discriminator, self).__init__()
         self.ns = ns
-        self.conv1 = nn.Conv1d(c_in, c_h, kernel_size=5, stride=2)
+        self.conv1 = nn.Conv1d(c_in, c_h, kernel_size=5)
         self.conv2 = nn.Conv1d(c_h, c_h, kernel_size=5, stride=2)
-        self.conv3 = nn.Conv1d(c_h, 1, kernel_size=16//4)
+        self.conv3 = nn.Conv1d(c_h, c_h, kernel_size=5, stride=2)
+        self.conv4 = nn.Conv1d(c_h, 1, kernel_size=16//4)
 
     def forward(self, x):
         out = pad_layer(x, self.conv1)
         out = F.leaky_relu(out, negative_slope=self.ns)
         out = pad_layer(out, self.conv2)
         out = F.leaky_relu(out, negative_slope=self.ns)
-        out = self.conv3(out)
+        out = pad_layer(out, self.conv3)
+        out = F.leaky_relu(out, negative_slope=self.ns)
+        out = self.conv4(out)
         out = out.view(out.size()[0], -1)
-        #out = F.logsigmoid(out)
+        #out = F.sigmoid(out)
         return out
 
 class CBHG(nn.Module):

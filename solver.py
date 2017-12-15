@@ -133,6 +133,7 @@ class Solver(object):
             iterations = pretrain_iterations
             flag = 'pretrain'
         for iteration in range(iterations):
+            current_alpha = alpha * (iteration + 1) / iterations
             for j in range(D_iterations):
                 #===================== Train D =====================#
                 data = next(self.data_loader)
@@ -149,7 +150,7 @@ class Solver(object):
                 diff_val = self.Discriminator(diff_pair)
                 gradients_penalty = calculate_gradients_penalty(self.Discriminator, same_pair, diff_pair)
                 w_distance = torch.mean(same_val - diff_val)
-                D_loss = -alpha * w_distance + lambda_ * gradients_penalty
+                D_loss = -current_alpha * w_distance + lambda_ * gradients_penalty
                 self.reset_grad()
                 D_loss.backward()
                 self.grad_clip([self.Discriminator])
@@ -185,7 +186,7 @@ class Solver(object):
             same_val = self.Discriminator(same_pair)
             diff_val = self.Discriminator(diff_pair)
             w_distance = torch.mean(same_val - diff_val)
-            G_loss = loss_rec + alpha * w_distance
+            G_loss = loss_rec + current_alpha * w_distance
             self.reset_grad()
             G_loss.backward()
             self.grad_clip([self.Encoder, self.Decoder])
@@ -193,15 +194,16 @@ class Solver(object):
             info = {
                 f'{flag}/loss_rec': loss_rec.data[0],
                 f'{flag}/G_w_distance': w_distance.data[0],
+                f'{flag}/alpha': current_alpha, 
             }
             slot_value = (iteration+1, iterations) + tuple([value for value in info.values()])
             print(
-                'G:[%06d/%06d], loss_rec=%.3f, w_distance=%.3f'
+                'G:[%06d/%06d], loss_rec=%.3f, w_distance=%.3f, alpha=%.2e'
                 % slot_value,
             )
             for tag, value in info.items():
                 self.logger.scalar_summary(tag, value, iteration + 1)
-            if iteration % 100 == 0 or iteration + 1 == iterations:
+            if iteration % 1000 == 0 or iteration + 1 == iterations:
                 self.save_model(model_path, iteration)
 
 if __name__ == '__main__':
