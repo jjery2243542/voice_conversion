@@ -127,7 +127,7 @@ class Solver(object):
         iterations = self.hps.iterations
         max_grad_norm = self.hps.max_grad_norm
         alpha, lambda_ = self.hps.alpha, self.hps.lambda_
-        flag = 'train'
+        flag = 'bgan'
         if pretrain:
             alpha, D_iterations = 0., 0
             iterations = pretrain_iterations

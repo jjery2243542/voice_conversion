@@ -257,5 +257,5 @@ if __name__ == '__main__':
     c = Variable(torch.from_numpy(np.random.randint(8, size=(16)))).cuda()
     d = D(e1, c)
     print(d.size())
-    c = C(torch.cat([e2,e2],dim=1))
+    c,_ = C(torch.cat([e2,e2],dim=1))
     print(c.size())
