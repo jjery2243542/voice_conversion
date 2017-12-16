@@ -18,6 +18,7 @@ if __name__ == '__main__':
     parser.add_argument('--train', default=True, action='store_true')
     parser.add_argument('--test', default=False, action='store_true')
     parser.add_argument('--load_model', default=False, action='store_true')
+    parser.add_argument('-hps_path', default='./hps/v4.json')
     parser.add_argument('-load_model_path', default='/storage/model/voice_conversion/'
             'pretrain_model.pkl-19999')
     parser.add_argument('-dataset_path', default='/storage/raw_feature/voice_conversion/vctk/vctk.h5')
@@ -26,7 +27,7 @@ if __name__ == '__main__':
     parser.add_argument('-output_model_path', default='/storage/model/voice_conversion/model.pkl')
     args = parser.parse_args()
     hps = Hps()
-    hps.load('./hps/v4.json')
+    hps.load(args.hps_path)
     hps_tuple = hps.get_tuple()
     dataset = myDataset(args.dataset_path,
             args.index_path,
