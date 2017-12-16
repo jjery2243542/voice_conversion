@@ -39,6 +39,6 @@ if __name__ == '__main__':
     if args.load_model:
         solver.load_model(args.load_model_path)
     if args.pretrain:
-        solver.train(args.pretrain_model_path, pretrain=True)
+        solver.train(args.pretrain_model_path, args.flag, pretrain=True)
     if args.train:
-        solver.train(args.output_model_path, pretrain=False)
+        solver.train(args.output_model_path, args.flag, pretrain=False)
