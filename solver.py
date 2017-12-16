@@ -119,7 +119,7 @@ class Solver(object):
         X_tilde = self.Decoder(E, c)
         return X_tilde.data.cpu().numpy()
 
-    def train(self, model_path, pretrain=True):
+    def train(self, model_path, flag='train', pretrain=True):
         # load hyperparams
         batch_size = self.hps.batch_size
         D_iterations = self.hps.D_iterations
@@ -127,11 +127,9 @@ class Solver(object):
         iterations = self.hps.iterations
         max_grad_norm = self.hps.max_grad_norm
         alpha, lambda_ = self.hps.alpha, self.hps.lambda_
-        flag = 'train'
         if pretrain:
             alpha, D_iterations = 0., 0
             iterations = pretrain_iterations
-            flag = 'pretrain'
         for iteration in range(iterations):
             current_alpha = alpha * (iteration + 1) / iterations
             for j in range(D_iterations):
