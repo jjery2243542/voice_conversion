@@ -18,6 +18,7 @@ if __name__ == '__main__':
     parser.add_argument('--train', default=True, action='store_true')
     parser.add_argument('--test', default=False, action='store_true')
     parser.add_argument('--load_model', default=False, action='store_true')
+    parser.add_argument('-flag', default='train')
     parser.add_argument('-hps_path', default='./hps/v4.json')
     parser.add_argument('-load_model_path', default='/storage/model/voice_conversion/'
             'pretrain_model.pkl-19999')
