@@ -8,7 +8,8 @@ import pickle
 from utils import myDataset
 from model import Encoder
 from model import Decoder
-from model import Discriminator
+from model import LatentDiscriminator
+from model import PatchDiscriminator
 from model import CBHG
 import os
 from utils import Hps
@@ -46,8 +47,8 @@ class Solver(object):
         self.max_keep = 10
         self.Encoder = None
         self.Decoder = None
-        self.Discriminator = None
-        #self.postnet = None
+        self.LatentDiscriminator = None
+        self.PatchDiscriminator = None
         self.G_opt = None
         self.D_opt = None
         self.build_model()
@@ -57,17 +58,17 @@ class Solver(object):
         ns = self.hps.ns
         self.Encoder = Encoder(ns=ns)
         self.Decoder = Decoder(ns=ns)
-        self.Discriminator = Discriminator(ns=ns)
-        #self.postnet = CBHG()
+        self.LatentDiscriminator = LatentDiscriminator(ns=ns)
+        self.PatchDiscriminator = PatchDiscriminator(ns=ns)
         if torch.cuda.is_available():
             self.Encoder.cuda()
             self.Decoder.cuda()
-            self.Discriminator.cuda()
-            #self.postnet.cuda()
+            self.LatentDiscriminator.cuda()
+            self.PatchDiscriminator.cuda()
         params = list(self.Encoder.parameters()) + list(self.Decoder.parameters())
-            #+ list(self.postnet.parameters())
         self.G_opt = optim.Adam(params, lr=self.hps.lr, betas=(0.5, 0.9))
-        self.D_opt = optim.Adam(self.Discriminator.parameters(), lr=self.hps.lr, betas=(0.5, 0.9))
+        params = list(self.PatchDiscriminator.parameters()) + list(self.LatentDiscriminator.parameters())
+        self.D_opt = optim.Adam(params, lr=self.hps.lr, betas=(0.5, 0.9))
 
     def to_var(self, x, requires_grad=True):
         x = Variable(x, requires_grad=requires_grad)
@@ -78,7 +79,8 @@ class Solver(object):
             all_model = {
                 'encoder': self.Encoder.state_dict(),
                 'decoder': self.Decoder.state_dict(),
-                'discriminator': self.Discriminator.state_dict(),
+                'latent_discriminator': self.LatentDiscriminator.state_dict(),
+                'patch_discriminator': self.PatchDiscriminator.state_dict(),
             }
         else:
             all_model = {
@@ -97,7 +99,8 @@ class Solver(object):
     def reset_grad(self):
         self.Encoder.zero_grad()
         self.Decoder.zero_grad()
-        self.Discriminator.zero_grad()
+        self.PatchDiscriminator.zero_grad()
+        self.LatentDiscriminator.zero_grad()
 
     def load_model(self, model_path, enc_only=True):
         print('load model from {}'.format(model_path))
@@ -106,7 +109,8 @@ class Solver(object):
             self.Encoder.load_state_dict(all_model['encoder'])
             self.Decoder.load_state_dict(all_model['decoder'])
             if not enc_only:
-                self.Discriminator.load_state_dict(all_model['discriminator'])
+                self.LatentDiscriminator.load_state_dict(all_model['latent_discriminator'])
+                self.PatchDiscriminator.load_state_dict(all_model['patch_discriminator'])
 
     def grad_clip(self, net_list):
         max_grad_norm = self.hps.max_grad_norm
@@ -126,15 +130,17 @@ class Solver(object):
         pretrain_iterations = self.hps.pretrain_iterations
         iterations = self.hps.iterations
         max_grad_norm = self.hps.max_grad_norm
-        alpha, lambda_ = self.hps.alpha, self.hps.lambda_
+        alpha, beta, lambda_ = self.hps.alpha, self.hps.beta, self.hps.lambda_
         if pretrain:
-            alpha, D_iterations = 0., 0
+            alpha, beta, D_iterations = 0., 0., 0
             iterations = pretrain_iterations
         for iteration in range(iterations):
             current_alpha = alpha * (iteration + 1) / iterations
+            current_beta = beta * (iteration + 1) / iterations
             for j in range(D_iterations):
                 #===================== Train D =====================#
                 data = next(self.data_loader)
+                c_i, c_j = [self.to_var(x, requires_grad=False) for x in data[:2]]
                 X_i_t, X_i_tk, X_i_prime, X_j = \
                         [self.to_var(x).permute(0, 2, 1) for x in data[2:]]
                 # encode
@@ -142,16 +148,25 @@ class Solver(object):
                 E_i_tk = self.Encoder(X_i_tk)
                 E_i_prime = self.Encoder(X_i_prime)
                 E_j = self.Encoder(X_j)
+                X_tilde = self.Decoder(E_i_t, c_i)
+                # latent discriminate
                 same_pair = torch.cat([E_i_t, E_i_tk], dim=1)
                 diff_pair = torch.cat([E_i_prime, E_j], dim=1)
-                same_val = self.Discriminator(same_pair)
-                diff_val = self.Discriminator(diff_pair)
-                gradients_penalty = calculate_gradients_penalty(self.Discriminator, same_pair, diff_pair)
-                w_distance = torch.mean(same_val - diff_val)
-                D_loss = -current_alpha * w_distance + lambda_ * gradients_penalty
+                same_val = self.LatentDiscriminator(same_pair)
+                diff_val = self.LatentDiscriminator(diff_pair)
+                latent_gp = calculate_gradients_penalty(self.LatentDiscriminator, same_pair, diff_pair)
+                latent_w_dis = torch.mean(same_val - diff_val)
+                # patch discriminate
+                D_real = self.PatchDiscriminator(X_i_t)
+                D_fake = self.PatchDiscriminator(X_tilde)
+                patch_gp = calculate_gradients_penalty(self.PatchDiscriminator, X_i_t, X_tilde)
+                patch_w_dis = torch.mean(D_real - D_fake)
+                D_loss = -current_alpha * latent_w_dis \
+                         -current_beta * patch_w_dis + \
+                         lambda_ * (latent_gp + patch_gp)
                 self.reset_grad()
                 D_loss.backward()
-                self.grad_clip([self.Discriminator])
+                self.grad_clip([self.PatchDiscriminator, self.LatentDiscriminator])
                 self.D_opt.step()
                 # print info
                 info = {

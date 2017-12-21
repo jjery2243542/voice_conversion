@@ -99,28 +99,32 @@ class PatchDiscriminator(nn.Module):
         self.conv3 = nn.Conv1d(c_h, c_h, kernel_size=5, stride=2)
         self.conv4 = nn.Conv1d(c_h, c_h, kernel_size=5, stride=2)
         self.conv5 = nn.Conv1d(c_h, 1, kernel_size=32//8)
-        #self.drop1 = nn.Dropout(p=dp)
-        #self.drop2 = nn.Dropout(p=dp)
-        #self.drop3 = nn.Dropout(p=dp)
-        #self.drop4 = nn.Dropout(p=dp)
+        self.drop1 = nn.Dropout(p=dp)
+        self.drop2 = nn.Dropout(p=dp)
+        self.drop3 = nn.Dropout(p=dp)
+        self.drop4 = nn.Dropout(p=dp)
 
     def forward(self, x):
         out = pad_layer(x, self.conv1)
+        out = self.drop1(out)
         out = F.leaky_relu(out, negative_slope=self.ns)
         out = pad_layer(out, self.conv2)
+        out = self.drop2(out)
         out = F.leaky_relu(out, negative_slope=self.ns)
         out = pad_layer(out, self.conv3)
+        out = self.drop3(out)
         out = F.leaky_relu(out, negative_slope=self.ns)
         out = pad_layer(out, self.conv4)
+        out = self.drop4(out)
         out = F.leaky_relu(out, negative_slope=self.ns)
         out = pad_layer(out, self.conv5)
         out = out.view(out.size()[0], -1)
         #out = F.sigmoid(out)
         return out
 
-class Discriminator(nn.Module):
+class LatentDiscriminator(nn.Module):
     def __init__(self, c_in=1024, c_h=256, ns=0.2, dp=0.3):
-        super(Discriminator, self).__init__()
+        super(LatentDiscriminator, self).__init__()
         self.ns = ns
         self.conv1 = nn.Conv1d(c_in, c_h, kernel_size=5)
         self.conv2 = nn.Conv1d(c_h, c_h, kernel_size=5, stride=2)
@@ -275,7 +279,7 @@ class Encoder(nn.Module):
 if __name__ == '__main__':
     E1, E2 = Encoder(513).cuda(), Encoder(513).cuda()
     D = Decoder().cuda()
-    C = Discriminator().cuda()
+    C = LatentDiscriminator().cuda()
     P = PatchDiscriminator().cuda()
     cbhg = CBHG().cuda()
     inp = Variable(torch.randn(16, 513, 128)).cuda()
