@@ -27,7 +27,7 @@ class Hps(object):
             'seg_len',
             'D_iterations',
             'batch_size',
-            'schedule_iterations',
+            'scheduled_iterations',
             'iterations',
             ]
         )

@@ -123,20 +123,18 @@ class Solver(object):
         X_tilde = self.Decoder(E, c)
         return X_tilde.data.cpu().numpy()
 
-    def train(self, model_path, flag='train', pretrain=True):
+    def train(self, model_path, flag='train'):
         # load hyperparams
         batch_size = self.hps.batch_size
         D_iterations = self.hps.D_iterations
-        pretrain_iterations = self.hps.pretrain_iterations
+        scheduled_iterations = self.hps.scheduled_iterations
         iterations = self.hps.iterations
         max_grad_norm = self.hps.max_grad_norm
         alpha, beta, lambda_ = self.hps.alpha, self.hps.beta, self.hps.lambda_
-        if pretrain:
-            alpha, beta, D_iterations = 0., 0., 0
-            iterations = pretrain_iterations
         for iteration in range(iterations):
-            current_alpha = alpha * (iteration + 1) / iterations
-            current_beta = beta * (iteration + 1) / iterations
+            if iteration + 1 < scheduled_iterations:
+                current_alpha = alpha * (iteration + 1) / scheduled_iterations
+                current_beta = beta * (iteration + 1) / scheduled_iterations
             for j in range(D_iterations):
                 #===================== Train D =====================#
                 data = next(self.data_loader)
@@ -171,12 +169,15 @@ class Solver(object):
                 # print info
                 info = {
                     f'{flag}/D_loss': D_loss.data[0],
-                    f'{flag}/D_w_distance': w_distance.data[0],
-                    f'{flag}/gradients_penalty': gradients_penalty.data[0],
+                    f'{flag}/D_latent_w_dis': latent_w_dis.data[0],
+                    f'{flag}/D_patch_w_dis': patch_w_dis.data[0],
+                    f'{flag}/latent_gp': latent_gp.data[0],
+                    f'{flag}/patch_gp': patch_gp.data[0],
                 }
                 slot_value = (j, iteration+1, iterations) + tuple([value for value in info.values()])
                 print(
-                    'D-%d:[%06d/%06d], D_loss=%.3f, w_distance=%.3f, gp=%.3f'
+                    'D-%d:[%06d/%06d], D_loss=%.3f, latent_w_dis=%.3f, patch_w_dis=%.3f, '
+                    'latent_gp=%.3f, patch_gp=%.3f'
                     % slot_value,
                 )
                 for tag, value in info.items():
@@ -196,22 +197,28 @@ class Solver(object):
             loss_rec = torch.mean(torch.abs(X_tilde - X_i_t))
             same_pair = torch.cat([E_i_t, E_i_tk], dim=1)
             diff_pair = torch.cat([E_i_prime, E_j], dim=1)
-            same_val = self.Discriminator(same_pair)
-            diff_val = self.Discriminator(diff_pair)
-            w_distance = torch.mean(same_val - diff_val)
-            G_loss = loss_rec + current_alpha * w_distance
+            same_val = self.LatentDiscriminator(same_pair)
+            diff_val = self.LatentDiscriminator(diff_pair)
+            latent_w_dis = torch.mean(same_val - diff_val)
+            # patch loss
+            D_real = self.PatchDiscriminator(X_i_t)
+            D_fake = self.PatchDiscriminator(X_tilde)
+            patch_w_dis = torch.mean(D_real - D_fake)
+            G_loss = loss_rec + current_alpha * latent_w_dis + current_beta * patch_w_dis
             self.reset_grad()
             G_loss.backward()
             self.grad_clip([self.Encoder, self.Decoder])
             self.G_opt.step()
             info = {
                 f'{flag}/loss_rec': loss_rec.data[0],
-                f'{flag}/G_w_distance': w_distance.data[0],
-                f'{flag}/alpha': current_alpha, 
+                f'{flag}/G_latent_w_dis': latent_w_dis.data[0],
+                f'{flag}/G_patch_w_dis': patch_w_dis.data[0],
+                f'{flag}/alpha': current_alpha,
+                f'{flag}/beta': current_beta,
             }
             slot_value = (iteration+1, iterations) + tuple([value for value in info.values()])
             print(
-                'G:[%06d/%06d], loss_rec=%.3f, w_distance=%.3f, alpha=%.2e'
+                'G:[%06d/%06d], loss_rec=%.3f, latent_w_dis=%.3f, patch_w_dis=%.3f, alpha=%.2e, beta=%.2e'
                 % slot_value,
             )
             for tag, value in info.items():
@@ -221,7 +228,7 @@ class Solver(object):
 
 if __name__ == '__main__':
     hps = Hps()
-    hps.load('./hps/v4.json')
+    hps.load('./hps/v7.json')
     hps_tuple = hps.get_tuple()
     dataset = myDataset('/storage/raw_feature/voice_conversion/vctk/vctk.h5',\
             '/storage/raw_feature/voice_conversion/vctk/64_513_2000k.json')
