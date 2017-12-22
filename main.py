@@ -14,7 +14,6 @@ import argparse
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--pretrain', default=False, action='store_true')
     parser.add_argument('--train', default=True, action='store_true')
     parser.add_argument('--test', default=False, action='store_true')
     parser.add_argument('--load_model', default=False, action='store_true')
@@ -38,7 +37,5 @@ if __name__ == '__main__':
     solver = Solver(hps_tuple, data_loader)
     if args.load_model:
         solver.load_model(args.load_model_path)
-    if args.pretrain:
-        solver.train(args.pretrain_model_path, args.flag, pretrain=True)
     if args.train:
-        solver.train(args.output_model_path, args.flag, pretrain=False)
+        solver.train(args.output_model_path, args.flag)
