@@ -91,7 +91,7 @@ def append_emb(inp, layer, expand_size, output):
 
 
 class PatchDiscriminator(nn.Module):
-    def __init__(self, c_in=513, c_h=256, ns=0.2, dp=0.3):
+    def __init__(self, c_in=513, c_h=256, n_class=8, ns=0.2, dp=0.3):
         super(PatchDiscriminator, self).__init__()
         self.ns = ns
         self.conv1 = nn.Conv1d(c_in, c_h, kernel_size=5)
@@ -99,6 +99,7 @@ class PatchDiscriminator(nn.Module):
         self.conv3 = nn.Conv1d(c_h, c_h, kernel_size=5, stride=2)
         self.conv4 = nn.Conv1d(c_h, c_h, kernel_size=5, stride=2)
         self.conv5 = nn.Conv1d(c_h, 1, kernel_size=32//8)
+        self.conv_classify = nn.Conv1d(c_h, n_class, kernel_size=128//8)
         self.drop1 = nn.Dropout(p=dp)
         self.drop2 = nn.Dropout(p=dp)
         self.drop3 = nn.Dropout(p=dp)
@@ -117,10 +118,15 @@ class PatchDiscriminator(nn.Module):
         out = pad_layer(out, self.conv4)
         out = self.drop4(out)
         out = F.leaky_relu(out, negative_slope=self.ns)
-        out = pad_layer(out, self.conv5)
-        out = out.view(out.size()[0], -1)
-        #out = F.sigmoid(out)
-        return out
+        print(out.size())
+        # GAN output value
+        val = pad_layer(out, self.conv5)
+        val = val.view(val.size()[0], -1)
+        # classify
+        logits = self.conv_classify(out)
+        logits = logits.view(logits.size()[0], -1)
+        logits = F.log_softmax(logits, dim=1)
+        return val, logits
 
 class LatentDiscriminator(nn.Module):
     def __init__(self, c_in=1024, c_h=256, ns=0.2, dp=0.3):
@@ -285,11 +291,7 @@ if __name__ == '__main__':
     inp = Variable(torch.randn(16, 513, 128)).cuda()
     e1 = E1(inp)
     e2 = E2(inp)
-    print(e1.size())
     c = Variable(torch.from_numpy(np.random.randint(8, size=(16)))).cuda()
     d = D(e1, c)
-    print(d.size())
     p = P(d)
-    print(p.size())
     c = C(torch.cat([e2,e2],dim=1))
-    print(c.size())
