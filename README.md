@@ -7,3 +7,4 @@
 - Patch GAN with classification
 - Patch GAN with random flip the label?
 - Patch GAN with i-vector prediction
+- Bilinear upsampling
