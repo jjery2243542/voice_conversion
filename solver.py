@@ -52,7 +52,8 @@ class Solver(object):
         self.PatchDiscriminator = None
         self.E_opt = None
         self.G_opt = None
-        self.D_opt = None
+        self.lat_D_opt = None
+        self.patch_D_opt = None
         self.build_model()
         self.logger = Logger(log_dir)
 
@@ -69,10 +70,10 @@ class Solver(object):
             self.PatchDiscriminator.cuda()
         betas = (0.5, 0.9)
         params = list(self.Encoder.parameters()) + list(self.Decoder.parameters())
-        self.E_opt = optim.Adam(params, lr=self.hps.lr, betas=betas)
-        self.G_opt = optim.Adam(self.Decoder.parameters(), lr=self.hps.lr, betas=betas)
-        params = list(self.PatchDiscriminator.parameters()) + list(self.LatentDiscriminator.parameters())
-        self.D_opt = optim.Adam(params, lr=self.hps.lr, betas=betas)
+        self.ae_opt = optim.Adam(params, lr=self.hps.lr, betas=betas)
+        self.decoder_opt = optim.Adam(self.Decoder.parameters(), lr=self.hps.lr, betas=betas)
+        self.lat_opt = optim.Adam(self.LatentDiscriminator.parameters(), lr=self.hps.lr, betas=betas)
+        self.patch_opt = optim.Adam(self.PatchDiscriminator.parameters(), lr=self.hps.lr, betas=betas)
 
     def to_var(self, x, requires_grad=True):
         x = Variable(x, requires_grad=requires_grad)
@@ -100,11 +101,9 @@ class Solver(object):
             os.remove(self.model_kept[0])
             self.model_kept.pop(0)
 
-    def reset_grad(self):
-        self.Encoder.zero_grad()
-        self.Decoder.zero_grad()
-        self.PatchDiscriminator.zero_grad()
-        self.LatentDiscriminator.zero_grad()
+    def reset_grad(self, net_list):
+        for net in net_list:
+            net.zero_grad()
 
     def load_model(self, model_path, enc_only=True):
         print('load model from {}'.format(model_path))
@@ -121,31 +120,31 @@ class Solver(object):
         for net in net_list:
             torch.nn.utils.clip_grad_norm(net.parameters(), max_grad_norm)
 
-    def test_step(self, X, c):
-        X = self.to_var(X).permute(0, 2, 1)
-        E = self.Encoder(X)
-        X_tilde = self.Decoder(E, c)
-        return X_tilde.data.cpu().numpy()
+    def test_step(self, x, c):
+        x = self.to_var(x).permute(0, 2, 1)
+        enc = self.Encoder(x)
+        x_tilde = self.Decoder(enc, c)
+        return x_tilde.data.cpu().numpy()
 
     def permute_data(self, data):
-        C = [self.to_var(x, requires_grad=False) for x in data[:2]]
+        C = [self.to_var(c, requires_grad=False) for c in data[:2]]
         X = [self.to_var(x).permute(0, 2, 1) for x in data[2:]]
         return C, X
 
-    def encode_step(self, X_i_t, X_i_tk, X_i_prime, X_j):
-        E_i_t = self.Encoder(X_i_t)
-        E_i_tk = self.Encoder(X_i_tk)
-        E_i_prime = self.Encoder(X_i_prime)
-        E_j = self.Encoder(X_j)
-        return E_i_t, E_i_tk, E_i_prime, E_j 
+    def encode_step(self, *args):
+        enc_list = []
+        for x in args:
+            enc = self.Encoder(x)
+            enc_list.append(enc)
+        return tuple(enc_list)
 
-    def decode_step(self, E, c):
-        X_tilde = self.Decoder(E, c)
-        return X_tilde
+    def decode_step(self, enc, c):
+        x_tilde = self.Decoder(enc, c)
+        return x_tilde
 
-    def latent_discriminate_step(self, E_i_t, E_i_tk, E_i_prime, E_j, cal_gp=True):
-        same_pair = torch.cat([E_i_t, E_i_tk], dim=1)
-        diff_pair = torch.cat([E_i_prime, E_j], dim=1)
+    def latent_discriminate_step(self, enc_i_t, enc_i_tk, enc_i_prime, enc_j, cal_gp=True):
+        same_pair = torch.cat([enc_i_t, enc_i_tk], dim=1)
+        diff_pair = torch.cat([enc_i_prime, enc_j], dim=1)
         same_val = self.LatentDiscriminator(same_pair)
         diff_val = self.LatentDiscriminator(diff_pair)
         w_dis = torch.mean(same_val - diff_val)
@@ -155,17 +154,17 @@ class Solver(object):
         else:
             return w_dis
 
-    def patch_discriminate_step(self, X, X_tilde, cal_gp=True):
-        D_real = self.PatchDiscriminator(X)
-        D_fake = self.PatchDiscriminator(X_tilde)
+    def patch_discriminate_step(self, x, x_tilde, cal_gp=True):
+        D_real = self.PatchDiscriminator(x)
+        D_fake = self.PatchDiscriminator(x_tilde)
         w_dis = torch.mean(D_real - D_fake)
         if cal_gp:
-            gp = calculate_gradients_penalty(self.PatchDiscriminator, X, X_tilde)
+            gp = calculate_gradients_penalty(self.PatchDiscriminator, x, x_tilde)
             return w_dis, gp
         else:
             return w_dis
 
-    def train(self, model_path, use_patchgan=False, flag='train'):
+    def train(self, model_path, flag='train'):
         # load hyperparams
         hps = self.hps
         for iteration in range(hps.iterations):
@@ -173,67 +172,79 @@ class Solver(object):
             if iteration + 1 < hps.scheduled_iterations:
                 current_alpha = hps.alpha * (iteration + 1) / hps.scheduled_iterations
                 current_beta = hps.beta * (iteration + 1) / hps.scheduled_iterations
-            for j in range(hps.D_iterations):
-                #===================== Train D =====================#
+            for step in range(hps.n_latent_steps):
+                #===================== Train latent discriminator =====================#
                 data = next(self.data_loader)
-                (c_i, c_j), (X_i_t, X_i_tk, X_i_prime, X_j) = self.permute_data(data)
+                (c_i, c_j), (x_i_t, x_i_tk, x_i_prime, x_j) = self.permute_data(data)
                 # encode
-                E_i_t, E_i_tk, E_i_prime, E_j = self.encode_step(X_i_t, X_i_tk, X_i_prime, X_j)
-                # decode 
-                X_tilde = self.decode_step(E_i_t, c_i)
+                enc_i_t, enc_i_tk, enc_i_prime, enc_j = self.encode_step(x_i_t, x_i_tk, x_i_prime, x_j)
                 # latent discriminate
-                latent_w_dis, latent_gp = self.latent_discriminate_step(E_i_t, E_i_tk, E_i_prime, E_j)
-                D_loss = -current_alpha * latent_w_dis + hps.lambda_ * latent_gp
-                # patch discriminate
-                if use_patchgan:
-                    patch_w_dis, patch_gp = self.patch_discriminate_step(X_i_t, X_tilde)
-                    patch_loss = -current_beta * patch_w_dis + hps.lambda_ * patch_gp
-                    D_loss += patch_loss
-                self.reset_grad()
-                D_loss.backward()
-                self.grad_clip([self.LatentDiscriminator, self.PatchDiscriminator])
-                self.D_opt.step()
+                latent_w_dis, latent_gp = self.latent_discriminate_step(enc_i_t, enc_i_tk, enc_i_prime, enc_j)
+                lat_loss = -current_alpha * latent_w_dis + hps.lambda_ * latent_gp
+                self.reset_grad([self.Encoder])
+                lat_loss.backward()
+                self.grad_clip([self.LatentDiscriminator])
+                self.lat_opt.step()
                 # print info
                 info = {
                     f'{flag}/D_latent_w_dis': latent_w_dis.data[0],
                     f'{flag}/latent_gp': latent_gp.data[0], 
-                    f'{flag}/D_patch_w_dis': 0.,
-                    f'{flag}/patch_gp': 0.,
                 }
-                # update the info values, if use_patchgan
-                if use_patchgan:
-                    info[f'{flag}/D_patch_w_dis'] = patch_w_dis.data[0]
-                    info[f'{flag}/patch_gp'] = patch_gp.data[0]
-                slot_value = (j, iteration+1, hps.iterations) + tuple([value for value in info.values()])
-                log = 'D-%d:[%06d/%06d], latent_w_dis=%.3f, latent_gp=%.2f, patch_w_dis=%.3f, patch_gp=%.2f'
+                slot_value = (step, iteration + 1, hps.iterations) + \
+                        tuple([value for value in info.values()])
+                log = 'lat_D-%d:[%06d/%06d], w_dis=%.3f, gp=%.2f'
+                print(log % slot_value)
+                for tag, value in info.items():
+                    self.logger.scalar_summary(tag, value, iteration)
+            for step in range(hps.n_patch_steps):
+                #===================== Train patch discriminator =====================#
+                data = next(self.data_loader)
+                (c_i, _), (x_i_t, _, _, _) = self.permute_data(data)
+                # encode
+                enc_i_t, = self.encode_step(x_i_t)
+                x_tilde = self.decode_step(enc_i_t, c_i)
+                patch_w_dis, patch_gp = self.patch_discriminate_step(x_i_t, x_tilde)
+                patch_loss = -current_beta * patch_w_dis + hps.lambda_ * patch_gp
+                self.reset_grad([self.Decoder])
+                patch_loss.backward()
+                self.grad_clip([self.PatchDiscriminator])
+                self.patch_opt.step()
+                # print info
+                info = {
+                    f'{flag}/D_patch_w_dis': patch_w_dis.data[0],
+                    f'{flag}/patch_gp': patch_gp.data[0],
+                }
+                slot_value = (step, iteration + 1, hps.iterations) + \
+                        tuple([value for value in info.values()])
+                log = 'patch_D-%d:[%06d/%06d], w_dis=%.3f, gp=%.2f'
                 print(log % slot_value)
                 for tag, value in info.items():
                     self.logger.scalar_summary(tag, value, iteration)
             #===================== Train G =====================#
             data = next(self.data_loader)
-            (c_i, c_j), (X_i_t, X_i_tk, X_i_prime, X_j) = self.permute_data(data)
+            (c_i, c_j), (x_i_t, x_i_tk, x_i_prime, x_j) = self.permute_data(data)
             # encode
-            E_i_t, E_i_tk, E_i_prime, E_j = self.encode_step(X_i_t, X_i_tk, X_i_prime, X_j)
+            enc_i_t, enc_i_tk, enc_i_prime, enc_j = self.encode_step(x_i_t, x_i_tk, x_i_prime, x_j)
             # decode
-            X_tilde = self.decode_step(E_i_t, c_i)
-            loss_rec = torch.mean(torch.abs(X_tilde - X_i_t))
+            x_tilde = self.decode_step(enc_i_t, c_i)
+            loss_rec = torch.mean(torch.abs(x_tilde - x_i_t))
             # latent discriminate
-            latent_w_dis = self.latent_discriminate_step(E_i_t, E_i_tk, E_i_prime, E_j, cal_gp=False)
-            # patch discriminate
-            if use_patchgan:
-                patch_w_dis = self.patch_discriminate_step(X_i_t, X_tilde, cal_gp=False)
-            E_loss = loss_rec + current_alpha * latent_w_dis
-            self.reset_grad()
-            E_loss.backward(retain_graph=use_patchgan)
+            latent_w_dis = self.latent_discriminate_step(
+                    enc_i_t, enc_i_tk, enc_i_prime, enc_j, cal_gp=False)
+            ae_loss = loss_rec + current_alpha * latent_w_dis
+            self.reset_grad([self.Encoder, self.Decoder])
+            retain_graph = True if hps.n_patch_steps > 0 else False
+            ae_loss.backward(retain_graph=retain_graph)
             self.grad_clip([self.Encoder, self.Decoder])
-            self.E_opt.step()
-            # patch loss only update decoder
-            if use_patchgan:
-                G_loss = current_beta * patch_w_dis
-                self.reset_grad()
-                G_loss.backward()
+            self.ae_opt.step()
+            # patch discriminate
+            if hps.n_patch_steps > 0:
+                patch_w_dis = self.patch_discriminate_step(x_i_t, x_tilde, cal_gp=False)
+                patch_loss = current_beta * patch_w_dis
+                self.reset_grad([self.Decoder])
+                patch_loss.backward()
                 self.grad_clip([self.Decoder])
-                self.G_opt.step()
+                self.decoder_opt.step()
             info = {
                 f'{flag}/loss_rec': loss_rec.data[0],
                 f'{flag}/G_latent_w_dis': latent_w_dis.data[0],
@@ -241,7 +252,7 @@ class Solver(object):
                 f'{flag}/alpha': current_alpha,
                 f'{flag}/beta': current_beta,
             }
-            if use_patchgan:
+            if hps.n_patch_steps > 0:
                 info[f'{flag}/G_patch_w_dis'] = patch_w_dis.data[0]
             slot_value = (iteration+1, hps.iterations) + tuple([value for value in info.values()])
             log = 'G:[%06d/%06d], loss_rec=%.3f, latent_w_dis=%.3f, patch_w_dis=%.3f, alpha=%.2e, beta=%.2e'
