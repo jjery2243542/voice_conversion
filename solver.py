@@ -29,6 +29,7 @@ def calculate_gradients_penalty(netD, real_data, fake_data):
     alpha = alpha.cuda() if torch.cuda.is_available() else alpha
     alpha = Variable(alpha)
     interpolates = alpha * real_data + (1 - alpha) * fake_data
+
     disc_interpolates = netD(interpolates)
 
     gradients = torch.autograd.grad(
@@ -49,6 +50,7 @@ class Solver(object):
         self.Decoder = None
         self.LatentDiscriminator = None
         self.PatchDiscriminator = None
+        self.E_opt = None
         self.G_opt = None
         self.D_opt = None
         self.build_model()
@@ -65,10 +67,11 @@ class Solver(object):
             self.Decoder.cuda()
             self.LatentDiscriminator.cuda()
             self.PatchDiscriminator.cuda()
-        params = list(self.Encoder.parameters()) + list(self.Decoder.parameters())
-        self.G_opt = optim.Adam(params, lr=self.hps.lr, betas=(0.5, 0.9))
+        betas = (0.5, 0.9)
+        self.E_opt = optim.Adam(self.Encoder.parameters(), lr=self.hps.lr, betas=betas)
+        self.G_opt = optim.Adam(self.Decoder.parameters(), lr=self.hps.lr, betas=betas)
         params = list(self.PatchDiscriminator.parameters()) + list(self.LatentDiscriminator.parameters())
-        self.D_opt = optim.Adam(params, lr=self.hps.lr, betas=(0.5, 0.9))
+        self.D_opt = optim.Adam(params, lr=self.hps.lr, betas=betas)
 
     def to_var(self, x, requires_grad=True):
         x = Variable(x, requires_grad=requires_grad)
@@ -123,45 +126,75 @@ class Solver(object):
         X_tilde = self.Decoder(E, c)
         return X_tilde.data.cpu().numpy()
 
+    def permute_data(self, data):
+        C = [self.to_var(x, requires_grad=False) for x in data[:2]]
+        X = [self.to_var(x).permute(0, 2, 1) for x in data[2:]]
+        return C, X
+
+    def encode_step(self, X_list):
+        batch_size = X_list[0].size(0)
+        X = torch.stack(X_list, dim=0)
+        X = X.view(X.size(0)*X.size(1), X.size(2), X.size(3))
+        E = self.Encoder(X)
+        E_i_t = E[:batch_size]
+        E_i_tk = E[batch_size:2*batch_size]
+        E_i_prime = E[2*batch_size:3*batch_size]
+        E_j = E[3*batch_size:]
+        return E_i_t, E_i_tk, E_i_prime, E_j 
+
+    def decode_step(self, E, c):
+        X_tilde = self.Decoder(E, c)
+        return X_tilde
+
+    def latent_discriminate_step(self, E_list, cal_gp=True):
+        E_i_t, E_i_tk, E_i_prime, E_j = E_list
+        same_pair = torch.cat([E_i_t, E_i_tk], dim=1)
+        diff_pair = torch.cat([E_i_prime, E_j], dim=1)
+        same_val = self.LatentDiscriminator(same_pair)
+        diff_val = self.LatentDiscriminator(diff_pair)
+        w_dis = torch.mean(same_val - diff_val)
+        if cal_gp:
+            gp = calculate_gradients_penalty(self.LatentDiscriminator, same_pair, diff_pair)
+        else:
+            gp = None
+        return w_dis, gp
+
+    def patch_discriminate_step(self, X, X_tilde, cal_gp=True):
+        D_real = self.PatchDiscriminator(X)
+        D_fake = self.PatchDiscriminator(X_tilde)
+        w_dis = torch.mean(D_real - D_fake)
+        if cal_gp:
+            gp = calculate_gradients_penalty(self.PatchDiscriminator, X, X_tilde)
+        else:
+            gp = None
+        return w_dis, gp
+
     def train(self, model_path, flag='train'):
         # load hyperparams
-        batch_size = self.hps.batch_size
-        D_iterations = self.hps.D_iterations
-        scheduled_iterations = self.hps.scheduled_iterations
-        iterations = self.hps.iterations
-        max_grad_norm = self.hps.max_grad_norm
-        alpha, beta, lambda_ = self.hps.alpha, self.hps.beta, self.hps.lambda_
-        for iteration in range(iterations):
-            if iteration + 1 < scheduled_iterations:
-                current_alpha = alpha * (iteration + 1) / scheduled_iterations
-                current_beta = beta * (iteration + 1) / scheduled_iterations
-            for j in range(D_iterations):
+        hps = self.hps
+        for iteration in range(hps.iterations):
+            # calculate current alpha, beta
+            if iteration + 1 < hps.scheduled_iterations:
+                current_alpha = hps.alpha * (iteration + 1) / hps.scheduled_iterations
+                current_beta = hps.beta * (iteration + 1) / hps.scheduled_iterations
+            for j in range(hps.D_iterations):
                 #===================== Train D =====================#
                 data = next(self.data_loader)
-                c_i, c_j = [self.to_var(x, requires_grad=False) for x in data[:2]]
-                X_i_t, X_i_tk, X_i_prime, X_j = \
-                        [self.to_var(x).permute(0, 2, 1) for x in data[2:]]
+                C_list, X_list = self.permute_data(data)
+                c_i, c_j = C_list
                 # encode
-                E_i_t = self.Encoder(X_i_t)
-                E_i_tk = self.Encoder(X_i_tk)
-                E_i_prime = self.Encoder(X_i_prime)
-                E_j = self.Encoder(X_j)
-                X_tilde = self.Decoder(E_i_t, c_i)
+                E_list = self.encode_step(X_list)
+                # decode E_i_t
+                E_i_t = E_list[0]
+                X_tilde = self.decode_step(E_i_t, c_i)
                 # latent discriminate
-                same_pair = torch.cat([E_i_t, E_i_tk], dim=1)
-                diff_pair = torch.cat([E_i_prime, E_j], dim=1)
-                same_val = self.LatentDiscriminator(same_pair)
-                diff_val = self.LatentDiscriminator(diff_pair)
-                latent_gp = calculate_gradients_penalty(self.LatentDiscriminator, same_pair, diff_pair)
-                latent_w_dis = torch.mean(same_val - diff_val)
+                latent_w_dis, latent_gp = self.latent_discriminate_step(E_list)
                 # patch discriminate
-                D_real = self.PatchDiscriminator(X_i_t)
-                D_fake = self.PatchDiscriminator(X_tilde)
-                patch_gp = calculate_gradients_penalty(self.PatchDiscriminator, X_i_t, X_tilde)
-                patch_w_dis = torch.mean(D_real - D_fake)
+                X_i_t = X_list[0]
+                patch_w_dis, patch_gp = self.patch_discriminate_step(X_i_t, X_tilde)
                 D_loss = -current_alpha * latent_w_dis \
                          -current_beta * patch_w_dis + \
-                         lambda_ * (latent_gp + patch_gp)
+                         hps.lambda_ * (latent_gp + patch_gp)
                 self.reset_grad()
                 D_loss.backward()
                 self.grad_clip([self.PatchDiscriminator, self.LatentDiscriminator])
@@ -174,40 +207,38 @@ class Solver(object):
                     f'{flag}/latent_gp': latent_gp.data[0],
                     f'{flag}/patch_gp': patch_gp.data[0],
                 }
-                slot_value = (j, iteration+1, iterations) + tuple([value for value in info.values()])
+                slot_value = (j, iteration+1, hps.iterations) + tuple([value for value in info.values()])
                 print(
                     'D-%d:[%06d/%06d], D_loss=%.3f, latent_w_dis=%.3f, patch_w_dis=%.3f, '
                     'latent_gp=%.3f, patch_gp=%.3f'
                     % slot_value,
                 )
                 for tag, value in info.items():
-                    self.logger.scalar_summary(tag, value, iteration + 1)
+                    self.logger.scalar_summary(tag, value, iteration*hps.D_iterations + j)
             #===================== Train G =====================#
             data = next(self.data_loader)
-            c_i, c_j = [self.to_var(x, requires_grad=False) for x in data[:2]]
-            X_i_t, X_i_tk, X_i_prime, X_j = \
-                    [self.to_var(x).permute(0, 2, 1) for x in data[2:]]
+            C_list, X_list = self.permute_data(data)
+            c_i, c_j = C_list
             # encode
-            E_i_t = self.Encoder(X_i_t)
-            E_i_tk = self.Encoder(X_i_tk)
-            E_i_prime = self.Encoder(X_i_prime)
-            E_j = self.Encoder(X_j)
+            E_list = self.encode_step(X_list)
             # reconstruction
-            X_tilde = self.Decoder(E_i_t, c_i)
+            E_i_t = E_list[0]
+            X_tilde = self.decode_step(E_i_t, c_i)
             loss_rec = torch.mean(torch.abs(X_tilde - X_i_t))
-            same_pair = torch.cat([E_i_t, E_i_tk], dim=1)
-            diff_pair = torch.cat([E_i_prime, E_j], dim=1)
-            same_val = self.LatentDiscriminator(same_pair)
-            diff_val = self.LatentDiscriminator(diff_pair)
-            latent_w_dis = torch.mean(same_val - diff_val)
-            # patch loss
-            D_real = self.PatchDiscriminator(X_i_t)
-            D_fake = self.PatchDiscriminator(X_tilde)
-            patch_w_dis = torch.mean(D_real - D_fake)
-            G_loss = loss_rec + current_alpha * latent_w_dis + current_beta * patch_w_dis
+            # latent discriminate
+            latent_w_dis, _ = self.latent_discriminate_step(E_list, cal_gp=False)
+            # patch discriminate
+            X_i_t = X_list[0]
+            patch_w_dis, _ = self.patch_discriminate_step(X_i_t, X_tilde, cal_gp=False)
+            E_loss = loss_rec + current_alpha * latent_w_dis
             self.reset_grad()
+            E_loss.backward(retain_graph=True)
+            self.grad_clip([self.Encoder])
+            self.E_opt.step()
+            # patch loss only update decoder
+            G_loss = current_beta * patch_w_dis
             G_loss.backward()
-            self.grad_clip([self.Encoder, self.Decoder])
+            self.grad_clip([self.Decoder])
             self.G_opt.step()
             info = {
                 f'{flag}/loss_rec': loss_rec.data[0],
@@ -216,14 +247,14 @@ class Solver(object):
                 f'{flag}/alpha': current_alpha,
                 f'{flag}/beta': current_beta,
             }
-            slot_value = (iteration+1, iterations) + tuple([value for value in info.values()])
+            slot_value = (iteration+1, hps.iterations) + tuple([value for value in info.values()])
             print(
                 'G:[%06d/%06d], loss_rec=%.3f, latent_w_dis=%.3f, patch_w_dis=%.3f, alpha=%.2e, beta=%.2e'
                 % slot_value,
             )
             for tag, value in info.items():
                 self.logger.scalar_summary(tag, value, iteration + 1)
-            if iteration % 1000 == 0 or iteration + 1 == iterations:
+            if iteration % 1000 == 0 or iteration + 1 == hps.iterations:
                 self.save_model(model_path, iteration)
 
 if __name__ == '__main__':

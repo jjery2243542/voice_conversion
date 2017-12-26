@@ -17,8 +17,7 @@ def pad_layer(inp, layer):
     inp = F.pad(
         torch.unsqueeze(inp, dim=3),
         pad=pad,
-        mode='reflect',
-        value=0.)
+        mode='reflect')
     inp = inp.squeeze(dim=3)
     out = layer(inp)
     return out
@@ -105,7 +104,7 @@ class PatchDiscriminator(nn.Module):
         self.drop3 = nn.Dropout(p=dp)
         self.drop4 = nn.Dropout(p=dp)
 
-    def forward(self, x):
+    def forward(self, x, classify=False):
         out = pad_layer(x, self.conv1)
         out = self.drop1(out)
         out = F.leaky_relu(out, negative_slope=self.ns)
@@ -118,15 +117,18 @@ class PatchDiscriminator(nn.Module):
         out = pad_layer(out, self.conv4)
         out = self.drop4(out)
         out = F.leaky_relu(out, negative_slope=self.ns)
-        print(out.size())
         # GAN output value
         val = pad_layer(out, self.conv5)
         val = val.view(val.size()[0], -1)
-        # classify
-        logits = self.conv_classify(out)
-        logits = logits.view(logits.size()[0], -1)
-        logits = F.log_softmax(logits, dim=1)
-        return val, logits
+        mean_val = torch.mean(val, dim=1)
+        if classify:
+            # classify
+            logits = self.conv_classify(out)
+            logits = logits.view(logits.size()[0], -1)
+            logits = F.log_softmax(logits, dim=1)
+            return mean_val, logits
+        else:
+            return mean_val
 
 class LatentDiscriminator(nn.Module):
     def __init__(self, c_in=1024, c_h=256, ns=0.2, dp=0.3):
@@ -151,7 +153,7 @@ class LatentDiscriminator(nn.Module):
         out = self.drop3(out)
         out = F.leaky_relu(out, negative_slope=self.ns)
         out = self.conv4(out)
-        out = out.view(out.size()[0], -1)
+        out = out.view(out.size()[0])
         #out = F.sigmoid(out)
         return out
 
