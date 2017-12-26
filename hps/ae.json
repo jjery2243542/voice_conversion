@@ -1,0 +1,15 @@
+{
+    "lr": 0.0002,
+    "alpha": 0.0,
+    "beta": 0.0,
+    "lambda_": 10,
+    "ns": 0.01,
+    "dp": 0.0,
+    "max_grad_norm": 5,
+    "max_step": 5,
+    "seg_len": 128,
+    "D_iterations": 0,
+    "batch_size": 32,
+    "scheduled_iterations": 300000,
+    "iterations": 100000
+}
