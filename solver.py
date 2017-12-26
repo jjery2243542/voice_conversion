@@ -15,7 +15,7 @@ import os
 from utils import Hps
 from utils import Logger
 from utils import DataLoader
-from preprocess.tacotron import utils
+#from preprocess.tacotron import utils
 
 def cal_mean_grad(net):
     grad = Variable(torch.FloatTensor([0])).cuda()
@@ -224,6 +224,7 @@ class Solver(object):
             # reconstruction
             E_i_t = E_list[0]
             X_tilde = self.decode_step(E_i_t, c_i)
+            X_i_t = X_list[0]
             loss_rec = torch.mean(torch.abs(X_tilde - X_i_t))
             # latent discriminate
             latent_w_dis, _ = self.latent_discriminate_step(E_list, cal_gp=False)
