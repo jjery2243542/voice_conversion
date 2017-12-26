@@ -131,23 +131,18 @@ class Solver(object):
         X = [self.to_var(x).permute(0, 2, 1) for x in data[2:]]
         return C, X
 
-    def encode_step(self, X_list):
-        batch_size = X_list[0].size(0)
-        X = torch.stack(X_list, dim=0)
-        X = X.view(X.size(0)*X.size(1), X.size(2), X.size(3))
-        E = self.Encoder(X)
-        E_i_t = E[:batch_size]
-        E_i_tk = E[batch_size:2*batch_size]
-        E_i_prime = E[2*batch_size:3*batch_size]
-        E_j = E[3*batch_size:]
+    def encode_step(self, X_i_t, X_i_tk, X_i_prime, X_j):
+        E_i_t = self.Encoder(X_i_t)
+        E_i_tk = self.Encoder(X_i_tk)
+        E_i_prime = self.Encoder(X_i_prime)
+        E_j = self.Encoder(X_j)
         return E_i_t, E_i_tk, E_i_prime, E_j 
 
     def decode_step(self, E, c):
         X_tilde = self.Decoder(E, c)
         return X_tilde
 
-    def latent_discriminate_step(self, E_list, cal_gp=True):
-        E_i_t, E_i_tk, E_i_prime, E_j = E_list
+    def latent_discriminate_step(self, E_i_t, E_i_tk, E_i_prime, E_j, cal_gp=True):
         same_pair = torch.cat([E_i_t, E_i_tk], dim=1)
         diff_pair = torch.cat([E_i_prime, E_j], dim=1)
         same_val = self.LatentDiscriminator(same_pair)
@@ -155,9 +150,9 @@ class Solver(object):
         w_dis = torch.mean(same_val - diff_val)
         if cal_gp:
             gp = calculate_gradients_penalty(self.LatentDiscriminator, same_pair, diff_pair)
+            return w_dis, gp
         else:
-            gp = None
-        return w_dis, gp
+            return w_dis
 
     def patch_discriminate_step(self, X, X_tilde, cal_gp=True):
         D_real = self.PatchDiscriminator(X)
@@ -165,9 +160,9 @@ class Solver(object):
         w_dis = torch.mean(D_real - D_fake)
         if cal_gp:
             gp = calculate_gradients_penalty(self.PatchDiscriminator, X, X_tilde)
+            return w_dis, gp
         else:
-            gp = None
-        return w_dis, gp
+            return w_dis
 
     def train(self, model_path, flag='train'):
         # load hyperparams
@@ -180,17 +175,14 @@ class Solver(object):
             for j in range(hps.D_iterations):
                 #===================== Train D =====================#
                 data = next(self.data_loader)
-                C_list, X_list = self.permute_data(data)
-                c_i, c_j = C_list
+                (c_i, c_j), (X_i_t, X_i_tk, X_i_prime, X_j) = self.permute_data(data)
                 # encode
-                E_list = self.encode_step(X_list)
-                # decode E_i_t
-                E_i_t = E_list[0]
+                E_i_t, E_i_tk, E_i_prime, E_j = self.encode_step(X_i_t, X_i_tk, X_i_prime, X_j)
+                # decode 
                 X_tilde = self.decode_step(E_i_t, c_i)
                 # latent discriminate
-                latent_w_dis, latent_gp = self.latent_discriminate_step(E_list)
+                latent_w_dis, latent_gp = self.latent_discriminate_step(E_i_t, E_i_tk, E_i_prime, E_j)
                 # patch discriminate
-                X_i_t = X_list[0]
                 patch_w_dis, patch_gp = self.patch_discriminate_step(X_i_t, X_tilde)
                 D_loss = -current_alpha * latent_w_dis \
                          -current_beta * patch_w_dis + \
@@ -217,20 +209,16 @@ class Solver(object):
                     self.logger.scalar_summary(tag, value, iteration*hps.D_iterations + j)
             #===================== Train G =====================#
             data = next(self.data_loader)
-            C_list, X_list = self.permute_data(data)
-            c_i, c_j = C_list
+            (c_i, c_j), (X_i_t, X_i_tk, X_i_prime, X_j) = self.permute_data(data)
             # encode
-            E_list = self.encode_step(X_list)
-            # reconstruction
-            E_i_t = E_list[0]
+            E_i_t, E_i_tk, E_i_prime, E_j = self.encode_step(X_i_t, X_i_tk, X_i_prime, X_j)
+            # decode E_i_t
             X_tilde = self.decode_step(E_i_t, c_i)
-            X_i_t = X_list[0]
             loss_rec = torch.mean(torch.abs(X_tilde - X_i_t))
             # latent discriminate
-            latent_w_dis, _ = self.latent_discriminate_step(E_list, cal_gp=False)
+            latent_w_dis = self.latent_discriminate_step(E_i_t, E_i_tk, E_i_prime, E_j, cal_gp=False)
             # patch discriminate
-            X_i_t = X_list[0]
-            patch_w_dis, _ = self.patch_discriminate_step(X_i_t, X_tilde, cal_gp=False)
+            patch_w_dis = self.patch_discriminate_step(X_i_t, X_tilde, cal_gp=False)
             E_loss = loss_rec + current_alpha * latent_w_dis
             self.reset_grad()
             E_loss.backward(retain_graph=True)
