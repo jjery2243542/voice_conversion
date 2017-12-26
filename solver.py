@@ -68,7 +68,8 @@ class Solver(object):
             self.LatentDiscriminator.cuda()
             self.PatchDiscriminator.cuda()
         betas = (0.5, 0.9)
-        self.E_opt = optim.Adam(self.Encoder.parameters(), lr=self.hps.lr, betas=betas)
+        params = list(self.Encoder.parameters()) + list(self.Decoder.parameters())
+        self.E_opt = optim.Adam(params, lr=self.hps.lr, betas=betas)
         self.G_opt = optim.Adam(self.Decoder.parameters(), lr=self.hps.lr, betas=betas)
         params = list(self.PatchDiscriminator.parameters()) + list(self.LatentDiscriminator.parameters())
         self.D_opt = optim.Adam(params, lr=self.hps.lr, betas=betas)
@@ -164,7 +165,7 @@ class Solver(object):
         else:
             return w_dis
 
-    def train(self, model_path, flag='train'):
+    def train(self, model_path, use_patchgan=False, flag='train'):
         # load hyperparams
         hps = self.hps
         for iteration in range(hps.iterations):
@@ -182,65 +183,69 @@ class Solver(object):
                 X_tilde = self.decode_step(E_i_t, c_i)
                 # latent discriminate
                 latent_w_dis, latent_gp = self.latent_discriminate_step(E_i_t, E_i_tk, E_i_prime, E_j)
+                D_loss = -current_alpha * latent_w_dis + hps.lambda_ * latent_gp
                 # patch discriminate
-                patch_w_dis, patch_gp = self.patch_discriminate_step(X_i_t, X_tilde)
-                D_loss = -current_alpha * latent_w_dis \
-                         -current_beta * patch_w_dis + \
-                         hps.lambda_ * (latent_gp + patch_gp)
+                if use_patchgan:
+                    patch_w_dis, patch_gp = self.patch_discriminate_step(X_i_t, X_tilde)
+                    patch_loss = -current_beta * patch_w_dis + hps.lambda_ * patch_gp
+                    D_loss += patch_loss
                 self.reset_grad()
                 D_loss.backward()
-                self.grad_clip([self.PatchDiscriminator, self.LatentDiscriminator])
+                self.grad_clip([self.LatentDiscriminator, self.PatchDiscriminator])
                 self.D_opt.step()
                 # print info
                 info = {
-                    f'{flag}/D_loss': D_loss.data[0],
                     f'{flag}/D_latent_w_dis': latent_w_dis.data[0],
-                    f'{flag}/D_patch_w_dis': patch_w_dis.data[0],
-                    f'{flag}/latent_gp': latent_gp.data[0],
-                    f'{flag}/patch_gp': patch_gp.data[0],
+                    f'{flag}/latent_gp': latent_gp.data[0], 
+                    f'{flag}/D_patch_w_dis': 0.,
+                    f'{flag}/patch_gp': 0.,
                 }
+                # update the info values, if use_patchgan
+                if use_patchgan:
+                    info[f'{flag}/D_patch_w_dis'] = patch_w_dis.data[0]
+                    info[f'{flag}/patch_gp'] = patch_gp.data[0]
                 slot_value = (j, iteration+1, hps.iterations) + tuple([value for value in info.values()])
-                print(
-                    'D-%d:[%06d/%06d], D_loss=%.3f, latent_w_dis=%.3f, patch_w_dis=%.3f, '
-                    'latent_gp=%.3f, patch_gp=%.3f'
-                    % slot_value,
-                )
+                log = 'D-%d:[%06d/%06d], latent_w_dis=%.3f, latent_gp=%.2f, patch_w_dis=%.3f, patch_gp=%.2f'
+                print(log % slot_value)
                 for tag, value in info.items():
-                    self.logger.scalar_summary(tag, value, iteration*hps.D_iterations + j)
+                    self.logger.scalar_summary(tag, value, iteration)
             #===================== Train G =====================#
             data = next(self.data_loader)
             (c_i, c_j), (X_i_t, X_i_tk, X_i_prime, X_j) = self.permute_data(data)
             # encode
             E_i_t, E_i_tk, E_i_prime, E_j = self.encode_step(X_i_t, X_i_tk, X_i_prime, X_j)
-            # decode E_i_t
+            # decode
             X_tilde = self.decode_step(E_i_t, c_i)
             loss_rec = torch.mean(torch.abs(X_tilde - X_i_t))
             # latent discriminate
             latent_w_dis = self.latent_discriminate_step(E_i_t, E_i_tk, E_i_prime, E_j, cal_gp=False)
             # patch discriminate
-            patch_w_dis = self.patch_discriminate_step(X_i_t, X_tilde, cal_gp=False)
+            if use_patchgan:
+                patch_w_dis = self.patch_discriminate_step(X_i_t, X_tilde, cal_gp=False)
             E_loss = loss_rec + current_alpha * latent_w_dis
             self.reset_grad()
-            E_loss.backward(retain_graph=True)
-            self.grad_clip([self.Encoder])
+            E_loss.backward(retain_graph=use_patchgan)
+            self.grad_clip([self.Encoder, self.Decoder])
             self.E_opt.step()
             # patch loss only update decoder
-            G_loss = current_beta * patch_w_dis
-            G_loss.backward()
-            self.grad_clip([self.Decoder])
-            self.G_opt.step()
+            if use_patchgan:
+                G_loss = current_beta * patch_w_dis
+                self.reset_grad()
+                G_loss.backward()
+                self.grad_clip([self.Decoder])
+                self.G_opt.step()
             info = {
                 f'{flag}/loss_rec': loss_rec.data[0],
                 f'{flag}/G_latent_w_dis': latent_w_dis.data[0],
-                f'{flag}/G_patch_w_dis': patch_w_dis.data[0],
+                f'{flag}/G_patch_w_dis': 0.,
                 f'{flag}/alpha': current_alpha,
                 f'{flag}/beta': current_beta,
             }
+            if use_patchgan:
+                info[f'{flag}/G_patch_w_dis'] = patch_w_dis.data[0]
             slot_value = (iteration+1, hps.iterations) + tuple([value for value in info.values()])
-            print(
-                'G:[%06d/%06d], loss_rec=%.3f, latent_w_dis=%.3f, patch_w_dis=%.3f, alpha=%.2e, beta=%.2e'
-                % slot_value,
-            )
+            log = 'G:[%06d/%06d], loss_rec=%.3f, latent_w_dis=%.3f, patch_w_dis=%.3f, alpha=%.2e, beta=%.2e'
+            print(log % slot_value)
             for tag, value in info.items():
                 self.logger.scalar_summary(tag, value, iteration + 1)
             if iteration % 1000 == 0 or iteration + 1 == hps.iterations:

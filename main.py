@@ -13,6 +13,7 @@ import argparse
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--train', default=True, action='store_true')
+    parser.add_argument('--use_patchgan', default=False, action='store_true')
     parser.add_argument('--test', default=False, action='store_true')
     parser.add_argument('--load_model', default=False, action='store_true')
     parser.add_argument('-flag', default='train')
@@ -36,4 +37,4 @@ if __name__ == '__main__':
     if args.load_model:
         solver.load_model(args.load_model_path)
     if args.train:
-        solver.train(args.output_model_path, args.flag)
+        solver.train(args.output_model_path, args.use_patchgan, args.flag)
