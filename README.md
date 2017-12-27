@@ -2,8 +2,8 @@
 
 ## TODO
 - Calculate similarity in latent space
-- Patch GAN loss
 - Patch GAN with condition
 - Patch GAN with classification
 - Patch GAN with random flip the label?
+- i-vector extraction
 - Patch GAN with i-vector prediction
