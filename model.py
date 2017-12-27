@@ -209,6 +209,7 @@ class Decoder(nn.Module):
         self.conv3 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=5)
         self.conv4 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=5)
         self.conv5 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=5)
+        self.RNN = nn.GRU(input_size=c_h + emb_size, hidden_size=c_h//2, num_layers=1, bidirectional=True)
         self.emb = nn.Embedding(c_a, emb_size)
         self.linear = nn.Linear(c_h + emb_size, c_out)
 
@@ -233,6 +234,8 @@ class Decoder(nn.Module):
         out5 = F.leaky_relu(out5, negative_slope=self.ns)
         out5 = append_emb(c, self.emb, out5.size(2), out5)
         out = out5 + out2
+        out = RNN(out, self.RNN)
+        out = append_emb(c, self.emb, out.size(2), out)
         out = linear(out, self.linear)
         return out
 
