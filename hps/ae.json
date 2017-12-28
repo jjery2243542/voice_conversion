@@ -11,6 +11,6 @@
     "n_latent_steps": 0,
     "n_patch_steps": 0,
     "batch_size": 32,
-    "scheduled_iterations": 200000,
-    "iterations": 50000
+    "scheduled_iterations": 20000,
+    "iterations": 100000
 }

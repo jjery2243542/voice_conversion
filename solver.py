@@ -180,8 +180,8 @@ class Solver(object):
                 enc_i_t, enc_i_tk, enc_i_prime, enc_j = self.encode_step(x_i_t, x_i_tk, x_i_prime, x_j)
                 # latent discriminate
                 latent_w_dis, latent_gp = self.latent_discriminate_step(enc_i_t, enc_i_tk, enc_i_prime, enc_j)
-                lat_loss = -current_alpha * latent_w_dis + hps.lambda_ * latent_gp
-                self.reset_grad([self.Encoder])
+                lat_loss = -hps.alpha * latent_w_dis + hps.lambda_ * latent_gp
+                self.reset_grad([self.LatentDiscriminator])
                 lat_loss.backward()
                 self.grad_clip([self.LatentDiscriminator])
                 self.lat_opt.step()
@@ -205,7 +205,7 @@ class Solver(object):
                 x_tilde = self.decode_step(enc_i_t, c_i)
                 patch_w_dis, patch_gp = self.patch_discriminate_step(x_i_t, x_tilde)
                 patch_loss = -current_beta * patch_w_dis + hps.lambda_ * patch_gp
-                self.reset_grad([self.Decoder])
+                self.reset_grad([self.PatchDiscriminator])
                 patch_loss.backward()
                 self.grad_clip([self.PatchDiscriminator])
                 self.patch_opt.step()

@@ -21,7 +21,6 @@ if __name__ == '__main__':
             'pretrain_model.pkl-19999')
     parser.add_argument('-dataset_path', default='/storage/raw_feature/voice_conversion/vctk/vctk.h5')
     parser.add_argument('-index_path', default='/storage/raw_feature/voice_conversion/vctk/128_513_2000k.json')
-    parser.add_argument('-pretrain_model_path', default='/storage/model/voice_conversion/pretrain_model.pkl')
     parser.add_argument('-output_model_path', default='/storage/model/voice_conversion/model.pkl')
     args = parser.parse_args()
     hps = Hps()
