@@ -7,3 +7,4 @@
 - Patch GAN with random flip the label?
 - i-vector extraction
 - Patch GAN with i-vector prediction
+- add classifier to embedding
