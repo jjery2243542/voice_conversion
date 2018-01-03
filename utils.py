@@ -17,7 +17,8 @@ class Hps(object):
     def __init__(self):
         self.hps = namedtuple('hps', [
             'lr',
-            'alpha',
+            'alpha1',
+            'alpha2',
             'beta', 
             'lambda_',
             'ns', 
@@ -32,7 +33,7 @@ class Hps(object):
             'iterations',
             ]
         )
-        default = [2e-4, 0.0001, 0.0001, 10, 0.01, 0.0, 5, 5, 128, 5, 5, 32, 200000, 300000]
+        default = [1e-4, 0.01, 0.0001, 0.0001, 10, 0.01, 0.0, 5, 5, 128, 5, 0, 32, 50000, 80000]
         self._hps = self.hps._make(default)
 
     def get_tuple(self):
@@ -215,10 +216,10 @@ class Logger(object):
 
 if __name__ == '__main__':
     hps = Hps()
-    hps.dump('./hps/v9.json')
-    dataset = myDataset('/storage/raw_feature/voice_conversion/vctk/vctk.h5',\
-            '/storage/raw_feature/voice_conversion/vctk/64_513_2000k.json')
-    data_loader = DataLoader(dataset)
+    hps.dump('./hps/v13.json')
+    #dataset = myDataset('/storage/raw_feature/voice_conversion/vctk/vctk.h5',\
+    #        '/storage/raw_feature/voice_conversion/vctk/64_513_2000k.json')
+    #data_loader = DataLoader(dataset)
     #for i, batch in enumerate(data_loader):
     #    print(Variable(batch[0]))
     #    exit(0)
