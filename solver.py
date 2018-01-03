@@ -170,7 +170,7 @@ class Solver(object):
         for iteration in range(hps.iterations):
             # calculate current alpha, beta
             if iteration + 1 < hps.scheduled_iterations:
-                current_alpha = hps.alpha * (iteration + 1) / hps.scheduled_iterations
+                current_alpha = hps.alpha2 * (iteration + 1) / hps.scheduled_iterations
                 current_beta = hps.beta * (iteration + 1) / hps.scheduled_iterations
             for step in range(hps.n_latent_steps):
                 #===================== Train latent discriminator =====================#
@@ -180,7 +180,7 @@ class Solver(object):
                 enc_i_t, enc_i_tk, enc_i_prime, enc_j = self.encode_step(x_i_t, x_i_tk, x_i_prime, x_j)
                 # latent discriminate
                 latent_w_dis, latent_gp = self.latent_discriminate_step(enc_i_t, enc_i_tk, enc_i_prime, enc_j)
-                lat_loss = -hps.alpha * latent_w_dis + hps.lambda_ * latent_gp
+                lat_loss = -hps.alpha1 * latent_w_dis + hps.lambda_ * latent_gp
                 self.reset_grad([self.LatentDiscriminator])
                 lat_loss.backward()
                 self.grad_clip([self.LatentDiscriminator])
