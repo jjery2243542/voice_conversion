@@ -4,20 +4,25 @@ import torch.nn.functional as F
 import torch
 from torch.autograd import Variable
 
-def pad_layer(inp, layer):
+def pad_layer(inp, layer, is_2d=False):
     if type(layer.kernel_size) == tuple:
         kernel_size = layer.kernel_size[0]
     else:
         kernel_size = layer.kernel_size
-    if kernel_size % 2 == 0:
-        pad = (kernel_size//2, kernel_size//2 - 1)
+    if not is_2d:
+        if kernel_size % 2 == 0:
+            pad = (kernel_size//2, kernel_size//2 - 1)
+        else:
+            pad = (kernel_size//2, kernel_size//2)
     else:
-        pad = (kernel_size//2, kernel_size//2)
+        if kernel_size % 2 == 0:
+            pad = (kernel_size//2, kernel_size//2 - 1, kernel_size//2, kernel_size//2 - 1)
+        else:
+            pad = (kernel_size//2, kernel_size//2, kernel_size//2, kernel_size//2)
     # padding
-    inp = F.pad(
-        inp,
-        pad=pad,
-        mode='reflect')
+    inp = F.pad(inp, 
+            pad=pad,
+            mode='reflect')
     out = layer(inp)
     return out
 
@@ -93,8 +98,8 @@ class PatchDiscriminator(nn.Module):
         self.conv2 = nn.Conv2d(64, 128, kernel_size=5, stride=2)
         self.conv3 = nn.Conv2d(128, 256, kernel_size=5, stride=2)
         self.conv4 = nn.Conv2d(256, 512, kernel_size=5, stride=2)
-        self.conv5 = nn.Conv2d(512, 1, kernel_size=32//8)
-        self.conv_classify = nn.Conv2d(512, n_class, kernel_size=128//8)
+        self.conv5 = nn.Conv2d(512, 1, kernel_size=8)
+        self.conv_classify = nn.Conv2d(512, n_class, kernel_size=(33, 8))
         self.drop1 = nn.Dropout(p=dp)
         self.drop2 = nn.Dropout(p=dp)
         self.drop3 = nn.Dropout(p=dp)
@@ -102,22 +107,21 @@ class PatchDiscriminator(nn.Module):
 
     def forward(self, x, classify=False):
         x = torch.unsqueeze(x, dim=1)
-        out = pad_layer(x, self.conv1)
+        out = pad_layer(x, self.conv1, is_2d=True)
         out = self.drop1(out)
         out = F.leaky_relu(out, negative_slope=self.ns)
-        out = pad_layer(out, self.conv2)
+        out = pad_layer(out, self.conv2, is_2d=True)
         out = self.drop2(out)
         out = F.leaky_relu(out, negative_slope=self.ns)
-        out = pad_layer(out, self.conv3)
+        out = pad_layer(out, self.conv3, is_2d=True)
         out = self.drop3(out)
         out = F.leaky_relu(out, negative_slope=self.ns)
-        out = pad_layer(out, self.conv4)
+        out = pad_layer(out, self.conv4, is_2d=True)
         out = self.drop4(out)
         out = F.leaky_relu(out, negative_slope=self.ns)
-        print(out.size())
         # GAN output value
-        val = pad_layer(out, self.conv5)
-        val = val.view(val.size()[0], -1)
+        val = pad_layer(out, self.conv5, is_2d=True)
+        val = val.view(val.size(0), -1)
         mean_val = torch.mean(val, dim=1)
         if classify:
             # classify
@@ -299,6 +303,7 @@ if __name__ == '__main__':
     c = Variable(torch.from_numpy(np.random.randint(8, size=(16)))).cuda()
     d = D(e1, c)
     print(d.size())
-    p = P(d)
+    p1, p2 = P(d, classify=True)
+    print(p1.size(), p2.size())
     c = C(torch.cat([e2,e2],dim=1))
     print(c.size())
