@@ -58,10 +58,10 @@ class Solver(object):
         self.logger = Logger(log_dir)
 
     def build_model(self):
-        ns = self.hps.ns
+        ns, seg_len = self.hps.ns, self.hps.seg_len
         self.Encoder = Encoder(ns=ns)
         self.Decoder = Decoder(ns=ns)
-        self.LatentDiscriminator = LatentDiscriminator(ns=ns)
+        self.LatentDiscriminator = LatentDiscriminator(seg_len=seg_len, ns=ns)
         self.PatchDiscriminator = PatchDiscriminator(ns=ns)
         if torch.cuda.is_available():
             self.Encoder.cuda()
