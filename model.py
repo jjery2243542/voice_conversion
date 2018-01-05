@@ -10,22 +10,19 @@ def pad_layer(inp, layer):
     else:
         kernel_size = layer.kernel_size
     if kernel_size % 2 == 0:
-        pad = (0, 0, kernel_size//2, kernel_size//2 - 1)
+        pad = (kernel_size//2, kernel_size//2 - 1)
     else:
-        pad = (0, 0, kernel_size//2, kernel_size//2)
+        pad = (kernel_size//2, kernel_size//2)
     # padding
     inp = F.pad(
-        torch.unsqueeze(inp, dim=3),
+        inp,
         pad=pad,
         mode='reflect')
-    inp = inp.squeeze(dim=3)
     out = layer(inp)
     return out
 
 def upsample(x, scale_factor=2):
-    # reshape
-    x = x.unsqueeze(dim=3)
-    x_up = F.upsample(x, scale_factor=2, mode='nearest')[:, :, :, 0]
+    x_up = F.upsample(x, scale_factor=2, mode='nearest')
     return x_up
 
 def GLU(inp, layer, res=True):
@@ -88,23 +85,23 @@ def append_emb(inp, layer, expand_size, output):
     output = torch.cat([output, emb_expand], dim=1)
     return output
 
-
 class PatchDiscriminator(nn.Module):
-    def __init__(self, c_in=513, c_h=256, n_class=8, ns=0.2, dp=0.3):
+    def __init__(self, c_in=513, n_class=8, ns=0.2, dp=0.3):
         super(PatchDiscriminator, self).__init__()
         self.ns = ns
-        self.conv1 = nn.Conv1d(c_in, c_h, kernel_size=5)
-        self.conv2 = nn.Conv1d(c_h, c_h, kernel_size=5, stride=2)
-        self.conv3 = nn.Conv1d(c_h, c_h, kernel_size=5, stride=2)
-        self.conv4 = nn.Conv1d(c_h, c_h, kernel_size=5, stride=2)
-        self.conv5 = nn.Conv1d(c_h, 1, kernel_size=32//8)
-        self.conv_classify = nn.Conv1d(c_h, n_class, kernel_size=128//8)
+        self.conv1 = nn.Conv2d(1, 64, kernel_size=5, stride=2)
+        self.conv2 = nn.Conv2d(64, 128, kernel_size=5, stride=2)
+        self.conv3 = nn.Conv2d(128, 256, kernel_size=5, stride=2)
+        self.conv4 = nn.Conv2d(256, 512, kernel_size=5, stride=2)
+        self.conv5 = nn.Conv2d(512, 1, kernel_size=32//8)
+        self.conv_classify = nn.Conv2d(512, n_class, kernel_size=128//8)
         self.drop1 = nn.Dropout(p=dp)
         self.drop2 = nn.Dropout(p=dp)
         self.drop3 = nn.Dropout(p=dp)
         self.drop4 = nn.Dropout(p=dp)
 
     def forward(self, x, classify=False):
+        x = torch.unsqueeze(x, dim=1)
         out = pad_layer(x, self.conv1)
         out = self.drop1(out)
         out = F.leaky_relu(out, negative_slope=self.ns)
@@ -117,6 +114,7 @@ class PatchDiscriminator(nn.Module):
         out = pad_layer(out, self.conv4)
         out = self.drop4(out)
         out = F.leaky_relu(out, negative_slope=self.ns)
+        print(out.size())
         # GAN output value
         val = pad_layer(out, self.conv5)
         val = val.view(val.size()[0], -1)
