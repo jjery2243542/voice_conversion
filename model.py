@@ -131,13 +131,13 @@ class PatchDiscriminator(nn.Module):
             return mean_val
 
 class LatentDiscriminator(nn.Module):
-    def __init__(self, c_in=1024, c_h=256, ns=0.2, dp=0.3):
+    def __init__(self, c_in=1024, c_h=256, seg_len=128, ns=0.2, dp=0.3):
         super(LatentDiscriminator, self).__init__()
         self.ns = ns
         self.conv1 = nn.Conv1d(c_in, c_h, kernel_size=5)
         self.conv2 = nn.Conv1d(c_h, c_h, kernel_size=5, stride=2)
         self.conv3 = nn.Conv1d(c_h, c_h, kernel_size=5, stride=2)
-        self.conv4 = nn.Conv1d(c_h, 1, kernel_size=16//4)
+        self.conv4 = nn.Conv1d(c_h, 1, kernel_size=seg_len//32)
         self.drop1 = nn.Dropout(p=dp)
         self.drop2 = nn.Dropout(p=dp)
         self.drop3 = nn.Dropout(p=dp)
@@ -290,13 +290,16 @@ class Encoder(nn.Module):
 if __name__ == '__main__':
     E1, E2 = Encoder(513).cuda(), Encoder(513).cuda()
     D = Decoder().cuda()
-    C = LatentDiscriminator().cuda()
+    C = LatentDiscriminator(seg_len=32).cuda()
     P = PatchDiscriminator().cuda()
     cbhg = CBHG().cuda()
-    inp = Variable(torch.randn(16, 513, 128)).cuda()
+    inp = Variable(torch.randn(16, 513, 32)).cuda()
     e1 = E1(inp)
     e2 = E2(inp)
+    print(e1.size())
     c = Variable(torch.from_numpy(np.random.randint(8, size=(16)))).cuda()
     d = D(e1, c)
+    print(d.size())
     p = P(d)
     c = C(torch.cat([e2,e2],dim=1))
+    print(c.size())
