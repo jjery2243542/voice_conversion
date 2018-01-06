@@ -19,7 +19,7 @@ if __name__ == '__main__':
             '/storage/raw_feature/voice_conversion/vctk/128_513_2000k.json')
     data_loader = DataLoader(dataset)
     solver = Solver(hps_tuple, data_loader)
-    solver.load_model('/storage/model/voice_conversion/v12/model.pkl-79999')
+    solver.load_model('/storage/model/voice_conversion/modelv11.pkl-yuelao')
     spec = np.loadtxt('./preprocess/test_code/lin.npy')
     spec2 = np.loadtxt('./preprocess/test_code/lin2.npy')
     spec_expand = np.expand_dims(spec, axis=0)
