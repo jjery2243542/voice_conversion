@@ -59,9 +59,10 @@ class Solver(object):
 
     def build_model(self):
         ns = self.hps.ns
+        emb_size = self.hps.emb_size
         self.Encoder = Encoder(ns=ns)
-        self.Decoder = Decoder(ns=ns)
-        self.LatentDiscriminator = LatentDiscriminator(ns=ns)
+        self.Decoder = Decoder(ns=ns, emb_size=emb_size)
+        self.LatentDiscriminator = LatentDiscriminator(ns=ns, emb_size=emb_size)
         self.PatchDiscriminator = PatchDiscriminator(ns=ns)
         if torch.cuda.is_available():
             self.Encoder.cuda()
