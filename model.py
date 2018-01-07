@@ -105,7 +105,7 @@ class PatchDiscriminator(nn.Module):
         self.drop3 = nn.Dropout(p=dp)
         self.drop4 = nn.Dropout(p=dp)
 
-    def forward(self, x, classify=False):
+    def forward(self, x):
         x = torch.unsqueeze(x, dim=1)
         out = pad_layer(x, self.conv1, is_2d=True)
         out = self.drop1(out)
