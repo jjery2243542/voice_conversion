@@ -134,7 +134,7 @@ class Solver(object):
 
     def sample_c(self, size):
         c_sample = Variable(
-                torch.multinomial(torch.ones(8), num_samples=x_i_t.size(0), replacement=True),  
+                torch.multinomial(torch.ones(8), num_samples=size, replacement=True),  
                 requires_grad=False)
         return c_sample
 
