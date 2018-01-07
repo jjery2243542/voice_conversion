@@ -139,6 +139,12 @@ class Solver(object):
         c_sample = c_sample.cuda() if torch.cuda.is_available() else c_sample
         return c_sample
 
+    def cal_acc(self, logits, y_true):
+        _, ind = torch.max(logits, dim=1)
+        print(ind.size())
+        acc = torch.sum((ind == y_true).type(torch.FloatTensor)) / y_true.size(0)
+        return acc
+
     def encode_step(self, *args):
         enc_list = []
         for x in args:
@@ -170,8 +176,8 @@ class Solver(object):
         # aux clssify loss 
         criterion = nn.NLLLoss()
         c_loss = criterion(real_logits, c) + criterion(fake_logits, c_sample)
-        real_acc = torch.sum((real_logits == c).type(torch.FloatTensor)) / c.size(0) 
-        fake_acc = torch.sum((fake_logits == c_sample).type(torch.FloatTensor)) / c_sample.size(0)
+        real_acc = self.cal_acc(real_logits, c)
+        fake_acc = self.cal_acc(fake_logits, c_sample)
         if cal_gp:
             gp = calculate_gradients_penalty(self.PatchDiscriminator, x, x_tilde)
             return w_dis, c_loss, real_acc, fake_acc, gp
