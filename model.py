@@ -208,7 +208,7 @@ class CBHG(nn.Module):
         return out
 
 class Decoder(nn.Module):
-    def __init__(self, c_in=512, c_out=80, c_h=512, c_a=8, emb_size=128, ns=0.2):
+    def __init__(self, c_in=512, c_out=513, c_h=512, c_a=8, emb_size=128, ns=0.2):
         super(Decoder, self).__init__()
         self.ns = ns
         self.conv1 = nn.Conv1d(c_in + emb_size, c_h, kernel_size=5)
@@ -218,7 +218,7 @@ class Decoder(nn.Module):
         self.conv5 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=5)
         self.RNN = nn.GRU(input_size=c_h + emb_size, hidden_size=c_h//2, num_layers=1, bidirectional=True)
         self.emb = nn.Embedding(c_a, emb_size)
-        self.linear = nn.Linear(c_h + emb_size, c_out)
+        self.linear = nn.Linear(2*c_h + emb_size, c_out)
 
     def forward(self, x, c):
         inp = append_emb(c, self.emb, x.size(2), x)
@@ -242,7 +242,7 @@ class Decoder(nn.Module):
         out5 = append_emb(c, self.emb, out5.size(2), out5)
         out = out5 + out2
         out_rnn = RNN(out, self.RNN)
-        out = append_emb(c, self.emb, out.size(2), out)
+        out = torch.cat([out, out_rnn], dim=1)
         out = linear(out, self.linear)
         return out
 
