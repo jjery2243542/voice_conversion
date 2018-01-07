@@ -136,6 +136,7 @@ class Solver(object):
         c_sample = Variable(
                 torch.multinomial(torch.ones(8), num_samples=size, replacement=True),  
                 requires_grad=False)
+        c_sample = c_sample.cuda() if torch.cuda.is_available() else c_sample
         return c_sample
 
     def encode_step(self, *args):
