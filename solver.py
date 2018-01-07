@@ -141,7 +141,6 @@ class Solver(object):
 
     def cal_acc(self, logits, y_true):
         _, ind = torch.max(logits, dim=1)
-        print(ind.size())
         acc = torch.sum((ind == y_true).type(torch.FloatTensor)) / y_true.size(0)
         return acc
 
