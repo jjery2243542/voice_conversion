@@ -263,8 +263,18 @@ class Solver(object):
             ae_loss.backward(retain_graph=retain_graph)
             self.grad_clip([self.Encoder, self.Decoder])
             self.ae_opt.step()
+            info = {
+                f'{flag}/loss_rec': loss_rec.data[0],
+                f'{flag}/G_latent_w_dis': latent_w_dis.data[0],
+                f'{flag}/alpha': current_alpha,
+            }
+            slot_value = (iteration+1, hps.iters) + tuple([value for value in info.values()])
+            log = 'G:[%06d/%06d], loss_rec=%.2f, latent_w_dis=%.2f, alpha=%.2e'
+            print(log % slot_value)
+            for tag, value in info.items():
+                self.logger.scalar_summary(tag, value, iteration + 1)
             # patch discriminate
-            if hps.n_patch_steps > 0 and iterations > hps.patch_start_iter:
+            if hps.n_patch_steps > 0 and iteration > hps.patch_start_iter:
                 c_sample = self.sample_c(x_i_t.size(0))
                 x_tilde = self.decode_step(enc_i_t, c_sample)
                 patch_w_dis, c_loss, real_acc, fake_acc = \
@@ -274,23 +284,17 @@ class Solver(object):
                 patch_loss.backward()
                 self.grad_clip([self.Decoder])
                 self.decoder_opt.step()
-            info = {
-                f'{flag}/loss_rec': loss_rec.data[0],
-                f'{flag}/G_latent_w_dis': latent_w_dis.data[0],
-                f'{flag}/G_patch_w_dis': 0.,
-                f'{flag}/c_loss': 0.,
-                f'{flag}/real_acc': 0.,
-                f'{flag}/fake_acc': 0.,
-                f'{flag}/alpha': current_alpha,
-            }
-            if hps.n_patch_steps > 0:
-                info[f'{flag}/G_patch_w_dis'] = patch_w_dis.data[0]
-            slot_value = (iteration+1, hps.iters) + tuple([value for value in info.values()])
-            log = 'G:[%06d/%06d], loss_rec=%.2f, latent_w_dis=%.2f, patch_w_dis=%.2f, ' \
-            'c_loss=%.2f, real_acc=%.2f, fake_acc=%.2f, alpha=%.2e'
-            print(log % slot_value)
-            for tag, value in info.items():
-                self.logger.scalar_summary(tag, value, iteration + 1)
+                info = {
+                    f'{flag}/G_patch_w_dis': patch_w_dis.data[0],
+                    f'{flag}/c_loss': c_loss.data[0],
+                    f'{flag}/real_acc': real_acc,
+                    f'{flag}/fake_acc': fake_acc,
+                }
+                slot_value = (iteration+1, hps.iters) + tuple([value for value in info.values()])
+                log = 'G:[%06d/%06d]: patch_w_dis=%.2f, c_loss=%.2f, real_acc=%.2f, fake_acc=%.2f'
+                print(log % slot_value)
+                for tag, value in info.items():
+                    self.logger.scalar_summary(tag, value, iteration + 1)
             if iteration % 1000 == 0 or iteration + 1 == hps.iters:
                 self.save_model(model_path, iteration)
 
