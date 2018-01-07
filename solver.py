@@ -46,14 +46,6 @@ class Solver(object):
         self.data_loader = data_loader
         self.model_kept = []
         self.max_keep = 10
-        self.Encoder = None
-        self.Decoder = None
-        self.LatentDiscriminator = None
-        self.PatchDiscriminator = None
-        self.E_opt = None
-        self.G_opt = None
-        self.lat_D_opt = None
-        self.patch_D_opt = None
         self.build_model()
         self.logger = Logger(log_dir)
 
@@ -63,13 +55,16 @@ class Solver(object):
         self.Decoder = Decoder(ns=ns)
         self.LatentDiscriminator = LatentDiscriminator(ns=ns)
         self.PatchDiscriminator = PatchDiscriminator(ns=ns)
+        self.Postnet = CBHG()
         if torch.cuda.is_available():
             self.Encoder.cuda()
             self.Decoder.cuda()
             self.LatentDiscriminator.cuda()
             self.PatchDiscriminator.cuda()
+            self.Postnet.cuda()
         betas = (0.5, 0.9)
-        params = list(self.Encoder.parameters()) + list(self.Decoder.parameters())
+        params = list(self.Encoder.parameters()) + list(self.Decoder.parameters()) + \
+                list(self.Postnet.parameters())
         self.ae_opt = optim.Adam(params, lr=self.hps.lr, betas=betas)
         self.decoder_opt = optim.Adam(self.Decoder.parameters(), lr=self.hps.lr, betas=betas)
         self.lat_opt = optim.Adam(self.LatentDiscriminator.parameters(), lr=self.hps.lr, betas=betas)

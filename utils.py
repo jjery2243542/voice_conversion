@@ -33,7 +33,7 @@ class Hps(object):
             'iterations',
             ]
         )
-        default = [1e-4, 0.01, 0.0001, 0.0001, 10, 0.01, 0.0, 5, 5, 128, 5, 0, 32, 50000, 80000]
+        default = [1e-4, 0.01, 0.0001, 0.0001, 10, 0.01, 0.0, 5, 5, 128, 5, 0, 32, 50000, 60000]
         self._hps = self.hps._make(default)
 
     def get_tuple(self):
@@ -202,6 +202,7 @@ class myDataset(data.Dataset):
         data.append(self.h5[f'train/{i0}/lin'][t_k:t_k+seg_len])
         data.append(self.h5[f'train/{i1}/lin'][t_prime:t_prime+seg_len])
         data.append(self.h5[f'train/{j}/lin'][t_j:t_j+seg_len])
+        data.append(self.h5[f'train/{i0}/mel'][t:t+seg_len])
         return tuple(data)
 
     def __len__(self):
@@ -216,7 +217,7 @@ class Logger(object):
 
 if __name__ == '__main__':
     hps = Hps()
-    hps.dump('./hps/v13.json')
+    hps.dump('./hps/v18.json')
     #dataset = myDataset('/storage/raw_feature/voice_conversion/vctk/vctk.h5',\
     #        '/storage/raw_feature/voice_conversion/vctk/64_513_2000k.json')
     #data_loader = DataLoader(dataset)

@@ -165,7 +165,7 @@ class LatentDiscriminator(nn.Module):
         return mean_value
 
 class CBHG(nn.Module):
-    def __init__(self, c_in=80, c_out=1025):
+    def __init__(self, c_in=80, c_out=513):
         super(CBHG, self).__init__()
         self.conv1s = nn.ModuleList(
                 [nn.Conv1d(c_in, 128, kernel_size=k) for k in range(1, 9)]
@@ -208,7 +208,7 @@ class CBHG(nn.Module):
         return out
 
 class Decoder(nn.Module):
-    def __init__(self, c_in=512, c_out=513, c_h=512, c_a=8, emb_size=128, ns=0.2):
+    def __init__(self, c_in=512, c_out=80, c_h=512, c_a=8, emb_size=128, ns=0.2):
         super(Decoder, self).__init__()
         self.ns = ns
         self.conv1 = nn.Conv1d(c_in + emb_size, c_h, kernel_size=5)
@@ -241,7 +241,7 @@ class Decoder(nn.Module):
         out5 = F.leaky_relu(out5, negative_slope=self.ns)
         out5 = append_emb(c, self.emb, out5.size(2), out5)
         out = out5 + out2
-        out = RNN(out, self.RNN)
+        out_rnn = RNN(out, self.RNN)
         out = append_emb(c, self.emb, out.size(2), out)
         out = linear(out, self.linear)
         return out
