@@ -123,14 +123,11 @@ class PatchDiscriminator(nn.Module):
         val = pad_layer(out, self.conv5, is_2d=True)
         val = val.view(val.size(0), -1)
         mean_val = torch.mean(val, dim=1)
-        if classify:
-            # classify
-            logits = self.conv_classify(out)
-            logits = logits.view(logits.size()[0], -1)
-            logits = F.log_softmax(logits, dim=1)
-            return mean_val, logits
-        else:
-            return mean_val
+        # classify
+        logits = self.conv_classify(out)
+        logits = logits.view(logits.size()[0], -1)
+        logits = F.log_softmax(logits, dim=1)
+        return mean_val, logits
 
 class LatentDiscriminator(nn.Module):
     def __init__(self, c_in=1024, c_h=256, ns=0.2, dp=0.3):
