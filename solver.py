@@ -132,7 +132,7 @@ class Solver(object):
         X = [self.to_var(x).permute(0, 2, 1) for x in data[2:]]
         return C, X
 
-    def sample_c(size):
+    def sample_c(self, size):
         c_sample = Variable(
                 torch.multinomial(torch.ones(8), num_samples=x_i_t.size(0), replacement=True),  
                 requires_grad=False)
