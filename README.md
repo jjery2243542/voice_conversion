@@ -8,3 +8,4 @@
 - i-vector extraction
 - Patch GAN with i-vector prediction
 - add classifier to embedding
+- add postnet and mel-scale

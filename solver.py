@@ -170,8 +170,8 @@ class Solver(object):
 
     def patch_discriminate_step(self, x, x_tilde, c, c_sample, cal_gp=True):
         # w-distance
-        D_real, real_logits = self.PatchDiscriminator(x)
-        D_fake, fake_logits = self.PatchDiscriminator(x_tilde)
+        D_real, real_logits = self.PatchDiscriminator(x, classify=True)
+        D_fake, fake_logits = self.PatchDiscriminator(x_tilde, classify=True)
         w_dis = torch.mean(D_real - D_fake)
         # aux clssify loss 
         criterion = nn.NLLLoss()
