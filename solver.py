@@ -132,6 +132,12 @@ class Solver(object):
         X = [self.to_var(x).permute(0, 2, 1) for x in data[2:]]
         return C, X
 
+    def sample_c(size):
+        c_sample = Variable(
+                torch.multinomial(torch.ones(8), num_samples=x_i_t.size(0), replacement=True),  
+                requires_grad=False)
+        return c_sample
+
     def encode_step(self, *args):
         enc_list = []
         for x in args:
@@ -210,7 +216,7 @@ class Solver(object):
                 (c_i, _), (x_i_t, _, _, _) = self.permute_data(data)
                 # encode
                 enc_i_t, = self.encode_step(x_i_t)
-                c_sample = torch.multinomial(torch.ones(8), num_samples=x_i_t.size(0), replacement=True)
+                c_sample = self.sample_c(x_i_t.size(0))
                 x_tilde = self.decode_step(enc_i_t, c_i)
                 # Aux classify loss
                 classify = True if hps.beta_clf > 0 else False
@@ -254,7 +260,7 @@ class Solver(object):
             self.ae_opt.step()
             # patch discriminate
             if hps.n_patch_steps > 0:
-                c_sample = torch.multinomial(torch.ones(8), num_samples=x_i_t.size(0), replacement=True)
+                c_sample = self.sample_c(x_i_t.size(0))
                 x_tilde = self.decode_step(enc_i_t, c_sample)
                 patch_w_dis, c_loss, real_acc, fake_acc = \
                         self.patch_discriminate_step(x_i_t, x_tilde, c_i, c_sample, cal_gp=False)
