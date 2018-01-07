@@ -274,7 +274,7 @@ class Solver(object):
             for tag, value in info.items():
                 self.logger.scalar_summary(tag, value, iteration + 1)
             # patch discriminate
-            if hps.n_patch_steps > 0 and iteration > hps.patch_start_iter:
+            if hps.n_patch_steps > 0 and iteration >= hps.patch_start_iter:
                 c_sample = self.sample_c(x_i_t.size(0))
                 x_tilde = self.decode_step(enc_i_t, c_sample)
                 patch_w_dis, c_loss, real_acc, fake_acc = \
