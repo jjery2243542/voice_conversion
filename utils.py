@@ -32,9 +32,9 @@ class Hps(object):
             'n_latent_steps',
             'n_patch_steps', 
             'batch_size',
-            'lat_scheduled_iterations',
-            'patch_scheduled_iterations',
-            'iterations',
+            'lat_sched_iters',
+            'patch_start_iter', 
+            'iters',
             ]
         )
         default = \

@@ -186,12 +186,10 @@ class Solver(object):
     def train(self, model_path, flag='train'):
         # load hyperparams
         hps = self.hps
-        for iteration in range(hps.iterations):
-            # calculate current alpha, beta
-            if iteration + 1 < hps.lat_scheduled_iterations:
-                current_alpha = hps.alpha_enc * (iteration + 1) / hps.lat_scheduled_iterations
-            if iteration + 1 < hps.patch_scheduled_iterations:
-                current_beta = hps.beta_dec * (iteration + 1) / hps.patch_scheduled_iterations
+        for iteration in range(hps.iters):
+            # calculate current alpha
+            if iteration + 1 < hps.lat_sched_iters:
+                current_alpha = hps.alpha_enc * (iteration + 1) / hps.lat_sched_iters
             for step in range(hps.n_latent_steps):
                 #===================== Train latent discriminator =====================#
                 data = next(self.data_loader)
@@ -210,43 +208,44 @@ class Solver(object):
                     f'{flag}/D_latent_w_dis': latent_w_dis.data[0],
                     f'{flag}/latent_gp': latent_gp.data[0], 
                 }
-                slot_value = (step, iteration + 1, hps.iterations) + \
+                slot_value = (step, iteration + 1, hps.iters) + \
                         tuple([value for value in info.values()])
                 log = 'lat_D-%d:[%06d/%06d], w_dis=%.3f, gp=%.2f'
                 print(log % slot_value)
                 for tag, value in info.items():
                     self.logger.scalar_summary(tag, value, iteration)
-            for step in range(hps.n_patch_steps):
-                #===================== Train patch discriminator =====================#
-                data = next(self.data_loader)
-                (c_i, _), (x_i_t, _, _, _) = self.permute_data(data)
-                # encode
-                enc_i_t, = self.encode_step(x_i_t)
-                c_sample = self.sample_c(x_i_t.size(0))
-                x_tilde = self.decode_step(enc_i_t, c_i)
-                # Aux classify loss
-                classify = True if hps.beta_clf > 0 else False
-                patch_w_dis, c_loss, real_acc, fake_acc, patch_gp = \
-                        self.patch_discriminate_step(x_i_t, x_tilde, c_i, c_sample)
-                patch_loss = -hps.beta_dis * patch_w_dis + hps.lambda_ * patch_gp + hps.beta_clf * c_loss
-                self.reset_grad([self.PatchDiscriminator])
-                patch_loss.backward()
-                self.grad_clip([self.PatchDiscriminator])
-                self.patch_opt.step()
-                # print info
-                info = {
-                    f'{flag}/D_patch_w_dis': patch_w_dis.data[0],
-                    f'{flag}/patch_gp': patch_gp.data[0],
-                    f'{flag}/c_loss': c_loss.data[0],
-                    f'{flag}/real_acc': real_acc,
-                    f'{flag}/fake_acc': fake_acc,
-                }
-                slot_value = (step, iteration + 1, hps.iterations) + \
-                        tuple([value for value in info.values()])
-                log = 'patch_D-%d:[%06d/%06d], w_dis=%.3f, gp=%.2f, c_loss=%.3f, real_acc=%.2f, fake_acc=%.2f'
-                print(log % slot_value)
-                for tag, value in info.items():
-                    self.logger.scalar_summary(tag, value, iteration)
+            # two stage training
+            if iteration >= hps.patch_start_iter:
+                for step in range(hps.n_patch_steps):
+                    #===================== Train patch discriminator =====================#
+                    data = next(self.data_loader)
+                    (c_i, _), (x_i_t, _, _, _) = self.permute_data(data)
+                    # encode
+                    enc_i_t, = self.encode_step(x_i_t)
+                    c_sample = self.sample_c(x_i_t.size(0))
+                    x_tilde = self.decode_step(enc_i_t, c_i)
+                    # Aux classify loss
+                    patch_w_dis, c_loss, real_acc, fake_acc, patch_gp = \
+                            self.patch_discriminate_step(x_i_t, x_tilde, c_i, c_sample)
+                    patch_loss = -hps.beta_dis * patch_w_dis + hps.lambda_ * patch_gp + hps.beta_clf * c_loss
+                    self.reset_grad([self.PatchDiscriminator])
+                    patch_loss.backward()
+                    self.grad_clip([self.PatchDiscriminator])
+                    self.patch_opt.step()
+                    # print info
+                    info = {
+                        f'{flag}/D_patch_w_dis': patch_w_dis.data[0],
+                        f'{flag}/patch_gp': patch_gp.data[0],
+                        f'{flag}/c_loss': c_loss.data[0],
+                        f'{flag}/real_acc': real_acc,
+                        f'{flag}/fake_acc': fake_acc,
+                    }
+                    slot_value = (step, iteration + 1, hps.iters) + \
+                            tuple([value for value in info.values()])
+                    log = 'patch_D-%d:[%06d/%06d], w_dis=%.3f, gp=%.2f, c_loss=%.3f, real_acc=%.2f, fake_acc=%.2f'
+                    print(log % slot_value)
+                    for tag, value in info.items():
+                        self.logger.scalar_summary(tag, value, iteration)
             #===================== Train G =====================#
             data = next(self.data_loader)
             (c_i, c_j), (x_i_t, x_i_tk, x_i_prime, x_j) = self.permute_data(data)
@@ -265,12 +264,12 @@ class Solver(object):
             self.grad_clip([self.Encoder, self.Decoder])
             self.ae_opt.step()
             # patch discriminate
-            if hps.n_patch_steps > 0:
+            if hps.n_patch_steps > 0 and iterations > hps.patch_start_iter:
                 c_sample = self.sample_c(x_i_t.size(0))
                 x_tilde = self.decode_step(enc_i_t, c_sample)
                 patch_w_dis, c_loss, real_acc, fake_acc = \
                         self.patch_discriminate_step(x_i_t, x_tilde, c_i, c_sample, cal_gp=False)
-                patch_loss = current_beta * patch_w_dis + hps.beta_clf * c_loss
+                patch_loss = hps.beta_dec * patch_w_dis + hps.beta_clf * c_loss
                 self.reset_grad([self.Decoder])
                 patch_loss.backward()
                 self.grad_clip([self.Decoder])
@@ -283,17 +282,16 @@ class Solver(object):
                 f'{flag}/real_acc': 0.,
                 f'{flag}/fake_acc': 0.,
                 f'{flag}/alpha': current_alpha,
-                f'{flag}/beta': current_beta,
             }
             if hps.n_patch_steps > 0:
                 info[f'{flag}/G_patch_w_dis'] = patch_w_dis.data[0]
-            slot_value = (iteration+1, hps.iterations) + tuple([value for value in info.values()])
+            slot_value = (iteration+1, hps.iters) + tuple([value for value in info.values()])
             log = 'G:[%06d/%06d], loss_rec=%.2f, latent_w_dis=%.2f, patch_w_dis=%.2f, ' \
-            'c_loss=%.2f, real_acc=%.2f, fake_acc=%.2f, alpha=%.2e, beta=%.2e'
+            'c_loss=%.2f, real_acc=%.2f, fake_acc=%.2f, alpha=%.2e'
             print(log % slot_value)
             for tag, value in info.items():
                 self.logger.scalar_summary(tag, value, iteration + 1)
-            if iteration % 1000 == 0 or iteration + 1 == hps.iterations:
+            if iteration % 1000 == 0 or iteration + 1 == hps.iters:
                 self.save_model(model_path, iteration)
 
 if __name__ == '__main__':
