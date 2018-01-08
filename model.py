@@ -123,8 +123,8 @@ class PatchDiscriminator(nn.Module):
         val = pad_layer(out, self.conv5, is_2d=True)
         val = val.view(val.size(0), -1)
         mean_val = torch.mean(val, dim=1)
-        # classify
         if classify:
+            # classify
             logits = self.conv_classify(out)
             logits = logits.view(logits.size()[0], -1)
             logits = F.log_softmax(logits, dim=1)
@@ -139,29 +139,33 @@ class LatentDiscriminator(nn.Module):
         self.conv1 = nn.Conv1d(c_in, c_h, kernel_size=5)
         self.conv2 = nn.Conv1d(c_h, c_h, kernel_size=5)
         self.conv3 = nn.Conv1d(c_h, c_h, kernel_size=5)
-        self.conv4 = nn.Conv1d(c_h, 1, kernel_size=4)
+        self.conv4 = nn.Conv1d(c_h, c_h, kernel_size=5)
+        self.conv5 = nn.Conv1d(c_h, 1, kernel_size=16)
         self.drop1 = nn.Dropout(p=dp)
         self.drop2 = nn.Dropout(p=dp)
         self.drop3 = nn.Dropout(p=dp)
 
     def forward(self, x):
-        out = pad_layer(x, self.conv1)
-        out = self.drop1(out)
-        out = F.leaky_relu(out, negative_slope=self.ns)
-        out = pad_layer(out, self.conv2)
-        out = self.drop2(out)
-        out = F.leaky_relu(out, negative_slope=self.ns)
-        out = pad_layer(out, self.conv3)
-        out = self.drop3(out)
-        out = F.leaky_relu(out, negative_slope=self.ns)
-        out = self.conv4(out)
+        out1 = pad_layer(x, self.conv1)
+        out1 = self.drop1(out1)
+        out1 = F.leaky_relu(out1, negative_slope=self.ns)
+        out2 = pad_layer(out1, self.conv2)
+        out2 = self.drop2(out2)
+        out2 = F.leaky_relu(out2, negative_slope=self.ns)
+        out3 = pad_layer(out2, self.conv3)
+        out3 = self.drop3(out3)
+        out3 = F.leaky_relu(out3, negative_slope=self.ns)
+        out4 = pad_layer(out3, self.conv3)
+        out4 = self.drop3(out4)
+        out4 = F.leaky_relu(out4, negative_slope=self.ns)
+        out = out4 + out1
+        out5 = self.conv4(out)
         out = out.view(out.size()[0], -1)
         mean_value = torch.mean(out, dim=1)
-        #out = F.sigmoid(out)
         return mean_value
 
 class CBHG(nn.Module):
-    def __init__(self, c_in=80, c_out=1025):
+    def __init__(self, c_in=80, c_out=513):
         super(CBHG, self).__init__()
         self.conv1s = nn.ModuleList(
                 [nn.Conv1d(c_in, 128, kernel_size=k) for k in range(1, 9)]
@@ -214,7 +218,7 @@ class Decoder(nn.Module):
         self.conv5 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=5)
         self.RNN = nn.GRU(input_size=c_h + emb_size, hidden_size=c_h//2, num_layers=1, bidirectional=True)
         self.emb = nn.Embedding(c_a, emb_size)
-        self.linear = nn.Linear(c_h + emb_size, c_out)
+        self.linear = nn.Linear(2*c_h + emb_size, c_out)
 
     def forward(self, x, c):
         inp = append_emb(c, self.emb, x.size(2), x)
@@ -237,8 +241,8 @@ class Decoder(nn.Module):
         out5 = F.leaky_relu(out5, negative_slope=self.ns)
         out5 = append_emb(c, self.emb, out5.size(2), out5)
         out = out5 + out2
-        out = RNN(out, self.RNN)
-        out = append_emb(c, self.emb, out.size(2), out)
+        out_rnn = RNN(out, self.RNN)
+        out = torch.cat([out, out_rnn], dim=1)
         out = linear(out, self.linear)
         return out
 
@@ -301,5 +305,8 @@ if __name__ == '__main__':
     e2 = E2(inp)
     c = Variable(torch.from_numpy(np.random.randint(8, size=(16)))).cuda()
     d = D(e1, c)
+    #print(d.size())
     p1, p2 = P(d, classify=True)
+    #print(p1.size(), p2.size())
     c = C(torch.cat([e2,e2],dim=1))
+    print(c.size())
