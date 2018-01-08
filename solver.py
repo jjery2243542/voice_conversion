@@ -167,21 +167,23 @@ class Solver(object):
         else:
             return (w_dis,)
 
-    def patch_discriminate_step(self, x, x_tilde, c, c_sample, cal_gp=True):
+    def patch_discriminate_step(self, x, x_tilde, cal_gp=True):
         # w-distance
         D_real, real_logits = self.PatchDiscriminator(x, classify=True)
         D_fake, fake_logits = self.PatchDiscriminator(x_tilde, classify=True)
         w_dis = torch.mean(D_real - D_fake)
-        # aux clssify loss 
-        criterion = nn.NLLLoss()
-        c_loss = criterion(real_logits, c) + criterion(fake_logits, c_sample)
-        real_acc = self.cal_acc(real_logits, c)
-        fake_acc = self.cal_acc(fake_logits, c_sample)
         if cal_gp:
             gp = calculate_gradients_penalty(self.PatchDiscriminator, x, x_tilde)
-            return w_dis, c_loss, real_acc, fake_acc, gp
+            return w_dis, real_logits, fake_logits, gp
         else:
-            return w_dis, c_loss, real_acc, fake_acc
+            return w_dis, real_logits, fake_logits
+    # backup
+    #def classify():
+    #    # aux clssify loss 
+    #    criterion = nn.NLLLoss()
+    #    c_loss = criterion(real_logits, c) + criterion(fake_logits, c_sample)
+    #    real_acc = self.cal_acc(real_logits, c)
+    #    fake_acc = self.cal_acc(fake_logits, c_sample)
 
     def train(self, model_path, flag='train'):
         # load hyperparams
@@ -225,7 +227,7 @@ class Solver(object):
                     c_sample = self.sample_c(x_i_t.size(0))
                     x_tilde = self.decode_step(enc_i_t, c_i)
                     # Aux classify loss
-                    patch_w_dis, c_loss, real_acc, fake_acc, patch_gp = \
+                    patch_w_dis, real_logits, fake_logits, patch_gp = \
                             self.patch_discriminate_step(x_i_t, x_tilde, c_i, c_sample)
                     patch_loss = -hps.beta_dis * patch_w_dis + hps.lambda_ * patch_gp + hps.beta_clf * c_loss
                     self.reset_grad([self.PatchDiscriminator])
@@ -277,8 +279,8 @@ class Solver(object):
             if hps.n_patch_steps > 0 and iteration >= hps.patch_start_iter:
                 c_sample = self.sample_c(x_i_t.size(0))
                 x_tilde = self.decode_step(enc_i_t, c_sample)
-                patch_w_dis, c_loss, real_acc, fake_acc = \
-                        self.patch_discriminate_step(x_i_t, x_tilde, c_i, c_sample, cal_gp=False)
+                patch_w_dis, real_logits, fake_logits = \
+                        self.patch_discriminate_step(x_i_t, x_tilde, cal_gp=False)
                 patch_loss = hps.beta_dec * patch_w_dis + hps.beta_clf * c_loss
                 self.reset_grad([self.Decoder])
                 patch_loss.backward()
