@@ -133,7 +133,7 @@ class PatchDiscriminator(nn.Module):
             return mean_val
 
 class LatentDiscriminator(nn.Module):
-    def __init__(self, c_in=1024, c_h=256, ns=0.2, dp=0.3):
+    def __init__(self, c_in=1024, c_h=512, ns=0.2, dp=0.3):
         super(LatentDiscriminator, self).__init__()
         self.ns = ns
         self.conv1 = nn.Conv1d(c_in, c_h, kernel_size=5)
@@ -153,14 +153,13 @@ class LatentDiscriminator(nn.Module):
         out2 = pad_layer(out1, self.conv2)
         out2 = self.drop2(out2)
         out2 = F.leaky_relu(out2, negative_slope=self.ns)
-        out2 = out2 + x
         out3 = pad_layer(out2, self.conv3)
         out3 = self.drop3(out3)
         out3 = F.leaky_relu(out3, negative_slope=self.ns)
         out4 = pad_layer(out3, self.conv4)
         out4 = self.drop4(out4)
         out4 = F.leaky_relu(out4, negative_slope=self.ns)
-        out = out4 + out2
+        out = out4 + out1
         out = self.conv5(out)
         out = out.view(out.size()[0], -1)
         mean_value = torch.mean(out, dim=1)

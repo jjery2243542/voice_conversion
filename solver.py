@@ -220,7 +220,7 @@ class Solver(object):
                     x_tilde = self.decode_step(enc_i_t, c_i)
                     # Aux classify loss
                     patch_w_dis, real_logits, fake_logits, patch_gp = \
-                            self.patch_discriminate_step(x_i_t, x_tilde, c_i, c_sample)
+                            self.patch_discriminate_step(x_i_t, x_tilde, cal_gp=True)
                     patch_loss = -hps.beta_dis * patch_w_dis + hps.lambda_ * patch_gp + hps.beta_clf * c_loss
                     self.reset_grad([self.PatchDiscriminator])
                     patch_loss.backward()
