@@ -218,8 +218,6 @@ class Decoder(nn.Module):
         self.conv5 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=5)
         self.dense1 = nn.Linear(c_h, c_h)
         self.dense2 = nn.Linear(c_h, c_h)
-        self.dense3 = nn.Linear(c_h, c_h)
-        self.dense4 = nn.Linear(c_h, c_h)
         self.RNN = nn.GRU(input_size=c_h + emb_size, hidden_size=c_h//2, num_layers=1, bidirectional=True)
         self.emb = nn.Embedding(c_a, emb_size)
         self.linear = nn.Linear(2*c_h + emb_size, c_out)
@@ -250,13 +248,9 @@ class Decoder(nn.Module):
         out_dense1 = F.leaky_relu(out_dense1, negative_slope=self.ns)
         out_dense2 = linear(out_dense1, self.dense2)
         out_dense2 = F.leaky_relu(out_dense2, negative_slope=self.ns)
-        out_dense2 = out_dense2 + out
-        out_dense3 = linear(out_dense2, self.dense3)
-        out_dense3 = F.leaky_relu(out_dense3, negative_slope=self.ns)
-        out_dense4 = linear(out_dense3, self.dense4)
-        out_dense4 = F.leaky_relu(out_dense4, negative_slope=self.ns)
-        out = out_dense4 + out_dense2
+        out = out_dense2 + out
         out = append_emb(c, self.emb, out.size(2), out)
+        # rnn layer
         out_rnn = RNN(out, self.RNN)
         out = torch.cat([out, out_rnn], dim=1)
         out = linear(out, self.linear)
