@@ -148,8 +148,8 @@ class LatentDiscriminator(nn.Module):
 
     def forward(self, x):
         out1 = pad_layer(x, self.conv1)
-        out1 = self.drop1(out)
-        out1 = F.leaky_relu(out, negative_slope=self.ns)
+        out1 = self.drop1(out1)
+        out1 = F.leaky_relu(out1, negative_slope=self.ns)
         out2 = pad_layer(out1, self.conv2)
         out2 = self.drop2(out2)
         out2 = F.leaky_relu(out2, negative_slope=self.ns)
