@@ -136,11 +136,11 @@ class LatentDiscriminator(nn.Module):
     def __init__(self, c_in=1024, c_h=256, ns=0.2, dp=0.3):
         super(LatentDiscriminator, self).__init__()
         self.ns = ns
-        self.conv1 = nn.Conv1d(c_in, c_h, kernel_size=5, stride=2)
-        self.conv2 = nn.Conv1d(c_h, c_h, kernel_size=5, stride=2)
-        self.conv3 = nn.Conv1d(c_h, c_h, kernel_size=5, stride=2)
-        self.conv4 = nn.Conv1d(c_h, c_h, kernel_size=5, stride=2)
-        self.conv5 = nn.Conv1d(c_h, 1, kernel_size=1)
+        self.conv1 = nn.Conv1d(c_in, c_h, kernel_size=5)
+        self.conv2 = nn.Conv1d(c_h, c_h, kernel_size=5)
+        self.conv3 = nn.Conv1d(c_h, c_h, kernel_size=5)
+        self.conv4 = nn.Conv1d(c_h, c_h, kernel_size=5)
+        self.conv5 = nn.Conv1d(c_h, 1, kernel_size=16)
         self.drop1 = nn.Dropout(p=dp)
         self.drop2 = nn.Dropout(p=dp)
         self.drop3 = nn.Dropout(p=dp)
@@ -205,6 +205,7 @@ class CBHG(nn.Module):
         out = highway(out, self.layers, self.gates, F.relu)
         out_rnn = RNN(out, self.RNN)
         out = linear(out_rnn, self.linear2)
+        out = F.sogmoid(out)
         return out
 
 class Decoder(nn.Module):

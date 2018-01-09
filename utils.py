@@ -218,12 +218,11 @@ class Logger(object):
 if __name__ == '__main__':
     hps = Hps()
     hps.dump('./hps/v18.json')
-    #dataset = myDataset('/storage/raw_feature/voice_conversion/vctk/vctk.h5',\
-    #        '/storage/raw_feature/voice_conversion/vctk/64_513_2000k.json')
-    #data_loader = DataLoader(dataset)
-    #for i, batch in enumerate(data_loader):
-    #    print(Variable(batch[0]))
-    #    exit(0)
+    dataset = myDataset('/home_local/jjery2243542/voice_conversion/datasets/vctk/vctk.h5',\
+            '/home_local/jjery2243542/voice_conversion/datasets/vctk/128_513_2000k.json')
+    data_loader = DataLoader(dataset)
+    for i, batch in enumerate(data_loader):
+        print(torch.max(batch[2]))
     #sampler = Sampler()
     #for i in range(100):
     #    print(sampler.sample())
