@@ -46,14 +46,6 @@ class Solver(object):
         self.data_loader = data_loader
         self.model_kept = []
         self.max_keep = 10
-        self.Encoder = None
-        self.Decoder = None
-        self.LatentDiscriminator = None
-        self.PatchDiscriminator = None
-        self.E_opt = None
-        self.G_opt = None
-        self.lat_D_opt = None
-        self.patch_D_opt = None
         self.build_model()
         self.logger = Logger(log_dir)
 

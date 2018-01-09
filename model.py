@@ -144,22 +144,24 @@ class LatentDiscriminator(nn.Module):
         self.drop1 = nn.Dropout(p=dp)
         self.drop2 = nn.Dropout(p=dp)
         self.drop3 = nn.Dropout(p=dp)
+        self.drop4 = nn.Dropout(p=dp)
 
     def forward(self, x):
         out1 = pad_layer(x, self.conv1)
-        out1 = self.drop1(out1)
-        out1 = F.leaky_relu(out1, negative_slope=self.ns)
+        out1 = self.drop1(out)
+        out1 = F.leaky_relu(out, negative_slope=self.ns)
         out2 = pad_layer(out1, self.conv2)
         out2 = self.drop2(out2)
         out2 = F.leaky_relu(out2, negative_slope=self.ns)
+        out2 = out2 + x
         out3 = pad_layer(out2, self.conv3)
         out3 = self.drop3(out3)
         out3 = F.leaky_relu(out3, negative_slope=self.ns)
-        out4 = pad_layer(out3, self.conv3)
-        out4 = self.drop3(out4)
+        out4 = pad_layer(out3, self.conv4)
+        out4 = self.drop4(out4)
         out4 = F.leaky_relu(out4, negative_slope=self.ns)
-        out = out4 + out1
-        out5 = self.conv4(out)
+        out = out4 + out2
+        out = self.conv5(out)
         out = out.view(out.size()[0], -1)
         mean_value = torch.mean(out, dim=1)
         return mean_value
@@ -205,6 +207,7 @@ class CBHG(nn.Module):
         out = highway(out, self.layers, self.gates, F.relu)
         out_rnn = RNN(out, self.RNN)
         out = linear(out_rnn, self.linear2)
+        out = F.sogmoid(out)
         return out
 
 class Decoder(nn.Module):
@@ -216,31 +219,41 @@ class Decoder(nn.Module):
         self.conv3 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=5)
         self.conv4 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=5)
         self.conv5 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=5)
+        self.dense1 = nn.Linear(c_h, c_h)
+        self.dense2 = nn.Linear(c_h, c_h)
         self.RNN = nn.GRU(input_size=c_h + emb_size, hidden_size=c_h//2, num_layers=1, bidirectional=True)
         self.emb = nn.Embedding(c_a, emb_size)
         self.linear = nn.Linear(2*c_h + emb_size, c_out)
 
     def forward(self, x, c):
+        # conv layer
         inp = append_emb(c, self.emb, x.size(2), x)
         inp = upsample(inp)
         out1 = pad_layer(inp, self.conv1)
         out1 = F.leaky_relu(out1, negative_slope=self.ns)
-        out1 = append_emb(c, self.emb, out1.size(2), out1)
-        out1 = upsample(out1)
-        out2 = pad_layer(out1, self.conv2)
-        out2 = F.leaky_relu(out2, negative_slope=self.ns)
-        out2 = append_emb(c, self.emb, out2.size(2), out2)
+        out2 = append_emb(c, self.emb, out1.size(2), out1)
         out2 = upsample(out2)
-        out3 = pad_layer(out2, self.conv3)
+        out2 = pad_layer(out2, self.conv2)
+        out2 = F.leaky_relu(out2, negative_slope=self.ns)
+        out3 = append_emb(c, self.emb, out2.size(2), out2)
+        out3 = upsample(out3)
+        out3 = pad_layer(out3, self.conv3)
         out3 = F.leaky_relu(out3, negative_slope=self.ns)
-        out3 = append_emb(c, self.emb, out3.size(2), out3)
-        out4 = pad_layer(out3, self.conv4)
+        out4 = append_emb(c, self.emb, out3.size(2), out3)
+        out4 = pad_layer(out4, self.conv4)
         out4 = F.leaky_relu(out4, negative_slope=self.ns)
-        out4 = append_emb(c, self.emb, out4.size(2), out4)
-        out5 = pad_layer(out4, self.conv5)
+        out5 = append_emb(c, self.emb, out4.size(2), out4)
+        out5 = pad_layer(out5, self.conv5)
         out5 = F.leaky_relu(out5, negative_slope=self.ns)
-        out5 = append_emb(c, self.emb, out5.size(2), out5)
-        out = out5 + out2
+        out = out5 + out3
+        # dense layer
+        out_dense1 = linear(out, self.dense1)
+        out_dense1 = F.leaky_relu(out_dense1, negative_slope=self.ns)
+        out_dense2 = linear(out_dense1, self.dense2)
+        out_dense2 = F.leaky_relu(out_dense2, negative_slope=self.ns)
+        out = out_dense2 + out
+        out = append_emb(c, self.emb, out.size(2), out)
+        # rnn layer
         out_rnn = RNN(out, self.RNN)
         out = torch.cat([out, out_rnn], dim=1)
         out = linear(out, self.linear)
