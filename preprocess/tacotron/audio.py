@@ -2,12 +2,15 @@ import librosa
 import librosa.filters
 import math
 import numpy as np
-import tensorflow as tf
+#import tensorflow as tf
 from scipy import signal
 import sys
 sys.path.append('/home/jjery2243542/research/vc/preprocess/tacotron')
-from hparams import hparams
+#from hparams import hparams
+from collections import namedtuple 
 
+Hparams = namedtuple('hparams', ['num_mels', 'num_freq', 'sample_rate', 'frame_length_ms', 'frame_shift_ms', 'preemphasis', 'min_level_db', 'ref_level_db', 'max_iters', 'griffin_lim_iters', 'power'])
+hparams = Hparams(80, 513, 16000, 50, 12.5, 0.97, -100, 20, 200, 60, 1.5)
 
 def load_wav(path):
   return librosa.core.load(path, sr=hparams.sample_rate)[0]
