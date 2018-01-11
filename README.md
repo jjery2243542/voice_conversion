@@ -12,3 +12,4 @@
 - 口音轉換
 - instance norm
 - add speaker classifier
+- broken
