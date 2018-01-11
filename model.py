@@ -306,7 +306,8 @@ class Encoder(nn.Module):
         out = out_dense4 + out_dense2
         out_rnn = RNN(out, self.RNN)
         out = torch.cat([out, out_rnn], dim=1)
-        out = linear(out, self.linear) 
+        out = linear(out, self.linear)
+        out = F.leaky_relu(out, nagative_slope=self.ns)
         return out
 
 if __name__ == '__main__':
