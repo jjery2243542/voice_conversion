@@ -132,6 +132,29 @@ class PatchDiscriminator(nn.Module):
         else:
             return mean_val
 
+class SpeakerClassifier(nn.Module):
+    def __init__(self, c_in=512, c_h=512, n_class=8):
+        super(SpeakerClassifier, self).__init__()
+        self.conv1 = nn.Conv1d(c_in, c_h, kernel_size=5)
+        self.conv2 = nn.Conv1d(c_h, c_h, kernel_size=5)
+        self.conv3 = nn.Conv1d(c_h, c_h, kernel_size=5)
+        self.conv4 = nn.Conv1d(c_h, c_h, kernel_size=5)
+        self.conv5 = nn.Conv1d(c_h, n_class, kernel_size=16)
+
+    def forward(self, x):
+        out1 = pad_layer(x, self.conv1)
+        out1 = F.relu(out1)
+        out2 = pad_layer(out1, self.conv2)
+        out2 = F.relu(out2)
+        out3 = pad_layer(out2, self.conv3)
+        out3 = F.relu(out3)
+        out4 = pad_layer(out3, self.conv4)
+        out4 = F.relu(out4)
+        out = out4 + out1
+        logits = self.conv5(out)
+        logits = logits.view(logits.size(0), -1)
+        return logits 
+
 class LatentDiscriminator(nn.Module):
     def __init__(self, c_in=1024, c_h=512, ns=0.2, dp=0.3):
         super(LatentDiscriminator, self).__init__()
@@ -315,10 +338,12 @@ if __name__ == '__main__':
     D = Decoder().cuda()
     C = LatentDiscriminator().cuda()
     P = PatchDiscriminator().cuda()
+    S = SpeakerClassifier().cuda()
     cbhg = CBHG().cuda()
     inp = Variable(torch.randn(16, 513, 128)).cuda()
     e1 = E1(inp)
     e2 = E2(inp)
+    s1 = S(e1)
     c = Variable(torch.from_numpy(np.random.randint(8, size=(16)))).cuda()
     d = D(e1, c)
     #print(d.size())
