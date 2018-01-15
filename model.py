@@ -25,6 +25,15 @@ def pad_layer(inp, layer, is_2d=False):
             mode='reflect')
     out = layer(inp)
     return out
+def pixel_shuffle_1d(inp, upscale_factor=2):
+    batch_size, channels, in_width = inp.size()
+    channels //= upscale_factor
+    
+    out_width = in_width * upscale_factor
+    inp_view = inp.contiguous().view(batch_size, channels, upscale_factor, in_width)
+    shuffle_out = inp_view.permute(0, 1, 3, 2).contiguous()
+    shuffle_out = shuffle_out.view(batch_size, channels, out_width)
+    return shuffle_out
 
 def upsample(x, scale_factor=2):
     x_up = F.upsample(x, scale_factor=2, mode='nearest')
