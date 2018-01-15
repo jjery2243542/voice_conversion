@@ -25,6 +25,7 @@ def pad_layer(inp, layer, is_2d=False):
             mode='reflect')
     out = layer(inp)
     return out
+
 def pixel_shuffle_1d(inp, upscale_factor=2):
     batch_size, channels, in_width = inp.size()
     channels //= upscale_factor
@@ -92,8 +93,7 @@ def linear(inp, layer):
     out = out_permuted.permute(0, 2, 1)
     return out
 
-def append_emb(inp, layer, expand_size, output):
-    emb = layer(inp)
+def append_emb(emb, expand_size, output):
     emb = emb.unsqueeze(dim=2)
     emb_expand = emb.expand(emb.size(0), emb.size(1), expand_size)
     output = torch.cat([output, emb_expand], dim=1)
@@ -241,56 +241,54 @@ class CBHG(nn.Module):
         out = F.sogmoid(out)
         return out
 
+def conv_block(x, first_layer, second_layer, emb, res=True, ns=0.2):
+    out = pad_layer(x, first_layer)
+    out = F.leaky_relu(out, negative_slope=ns)
+    out = pixel_shuffle_1d(out, upscale_factor=2)
+    out = append_emb(emb, out.size(2), out)
+    out = pad_layer(out, second_layer)
+    out = F.leaky_relu(out, negative_slope=ns)
+    if res:
+        x_up = upsample(x, scale_factor=2)
+        print(x_up.size())
+        out = out + x_up
+    return out
+
 class Decoder(nn.Module):
     def __init__(self, c_in=512, c_out=513, c_h=512, c_a=8, emb_size=128, ns=0.2):
         super(Decoder, self).__init__()
         self.ns = ns
-        self.conv1 = nn.Conv1d(c_in + emb_size, c_h, kernel_size=5)
+        self.conv1 = nn.Conv1d(c_in, 2*c_h, kernel_size=5)
         self.conv2 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=5)
-        self.conv3 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=5)
+        self.conv3 = nn.Conv1d(c_h, 2*c_h, kernel_size=5)
         self.conv4 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=5)
-        self.conv5 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=5)
+        self.conv5 = nn.Conv1d(c_h, 2*c_h, kernel_size=5)
+        self.conv6 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=5)
         self.dense1 = nn.Linear(c_h, c_h)
         self.dense2 = nn.Linear(c_h, c_h)
         #self.dense3 = nn.Linear(c_h, c_h)
         #self.dense4 = nn.Linear(c_h, c_h)
         self.RNN = nn.GRU(input_size=c_h + emb_size, hidden_size=c_h//2, num_layers=1, bidirectional=True)
         self.emb = nn.Embedding(c_a, emb_size)
-        self.linear = nn.Linear(2*c_h + emb_size, c_out)
+        self.linear = nn.Linear(2*c_h, c_out)
 
     def forward(self, x, c):
+        emb = self.emb(c)
         # conv layer
-        inp = append_emb(c, self.emb, x.size(2), x)
-        inp = upsample(inp)
-        out1 = pad_layer(inp, self.conv1)
-        out1 = F.leaky_relu(out1, negative_slope=self.ns)
-        out2 = append_emb(c, self.emb, out1.size(2), out1)
-        out2 = upsample(out2)
-        out2 = pad_layer(out2, self.conv2)
-        out2 = F.leaky_relu(out2, negative_slope=self.ns)
-        out3 = append_emb(c, self.emb, out2.size(2), out2)
-        out3 = upsample(out3)
-        out3 = pad_layer(out3, self.conv3)
-        out3 = F.leaky_relu(out3, negative_slope=self.ns)
-        out4 = append_emb(c, self.emb, out3.size(2), out3)
-        out4 = pad_layer(out4, self.conv4)
-        out4 = F.leaky_relu(out4, negative_slope=self.ns)
-        out5 = append_emb(c, self.emb, out4.size(2), out4)
-        out5 = pad_layer(out5, self.conv5)
-        out5 = F.leaky_relu(out5, negative_slope=self.ns)
-        out = out5 + out3
+        out = conv_block(x, self.conv1, self.conv2, emb, res=False, ns=self.ns)
+        out = conv_block(out, self.conv3, self.conv4, emb, res=True, ns=self.ns)
+        out = conv_block(out, self.conv5, self.conv6, emb, res=True, ns=self.ns)
         # dense layer
         out_dense1 = linear(out, self.dense1)
         out_dense1 = F.leaky_relu(out_dense1, negative_slope=self.ns)
         out_dense2 = linear(out_dense1, self.dense2)
         out_dense2 = F.leaky_relu(out_dense2, negative_slope=self.ns)
         out = out_dense2 + out
-        out = append_emb(c, self.emb, out.size(2), out)
+        out_appended = append_emb(emb, out.size(2), out)
         # rnn layer
-        out_rnn = RNN(out, self.RNN)
+        out_rnn = RNN(out_appended, self.RNN)
         out = torch.cat([out, out_rnn], dim=1)
         out = linear(out, self.linear)
-        #out = F.tanh(out)
         return out
 
 class Encoder(nn.Module):
@@ -355,8 +353,8 @@ if __name__ == '__main__':
     s1 = S(e1)
     c = Variable(torch.from_numpy(np.random.randint(8, size=(16)))).cuda()
     d = D(e1, c)
-    #print(d.size())
+    print(d.size())
     p1, p2 = P(d, classify=True)
-    #print(p1.size(), p2.size())
+    print(p1.size(), p2.size())
     c = C(torch.cat([e2,e2],dim=1))
     print(c.size())
