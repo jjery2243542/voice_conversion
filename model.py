@@ -178,20 +178,17 @@ class LatentDiscriminator(nn.Module):
         self.drop3 = nn.Dropout(p=dp)
         self.drop4 = nn.Dropout(p=dp)
 
+    def conv_block(self, x, conv_layer, dropout_layer):
+        out = pad_layer(x, conv_layer)
+        out = dropout_layer(out)
+        out = F.leaky_relu(out, negative_slope=self.ns)
+        return out
+
     def forward(self, x):
-        out1 = pad_layer(x, self.conv1)
-        out1 = self.drop1(out1)
-        out1 = F.leaky_relu(out1, negative_slope=self.ns)
-        out2 = pad_layer(out1, self.conv2)
-        out2 = self.drop2(out2)
-        out2 = F.leaky_relu(out2, negative_slope=self.ns)
-        out3 = pad_layer(out2, self.conv3)
-        out3 = self.drop3(out3)
-        out3 = F.leaky_relu(out3, negative_slope=self.ns)
-        out4 = pad_layer(out3, self.conv4)
-        out4 = self.drop4(out4)
-        out4 = F.leaky_relu(out4, negative_slope=self.ns)
-        out = out4 + out1
+        out = self.conv_block(x, self.conv1, self.drop1)
+        out = self.conv_block(out, self.conv2, self.drop2)
+        out = self.conv_block(out, self.conv3, self.drop3)
+        out = self.conv_block(out, self.conv4, self.drop4)
         out = self.conv5(out)
         out = out.view(out.size()[0], -1)
         mean_value = torch.mean(out, dim=1)
@@ -241,17 +238,6 @@ class CBHG(nn.Module):
         out = F.sogmoid(out)
         return out
 
-def conv_block(x, first_layer, second_layer, emb, res=True, ns=0.2):
-    out = pad_layer(x, first_layer)
-    out = F.leaky_relu(out, negative_slope=ns)
-    out = pixel_shuffle_1d(out, upscale_factor=2)
-    out = append_emb(emb, out.size(2), out)
-    out = pad_layer(out, second_layer)
-    out = F.leaky_relu(out, negative_slope=ns)
-    if res:
-        x_up = upsample(x, scale_factor=2)
-        out = out + x_up
-    return out
 
 class Decoder(nn.Module):
     def __init__(self, c_in=512, c_out=513, c_h=512, c_a=8, emb_size=128, ns=0.2):
@@ -265,24 +251,42 @@ class Decoder(nn.Module):
         self.conv6 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=5)
         self.dense1 = nn.Linear(c_h, c_h)
         self.dense2 = nn.Linear(c_h, c_h)
-        #self.dense3 = nn.Linear(c_h, c_h)
-        #self.dense4 = nn.Linear(c_h, c_h)
+        self.dense3 = nn.Linear(c_h, c_h)
+        self.dense4 = nn.Linear(c_h, c_h)
         self.RNN = nn.GRU(input_size=c_h + emb_size, hidden_size=c_h//2, num_layers=1, bidirectional=True)
         self.emb = nn.Embedding(c_a, emb_size)
         self.linear = nn.Linear(2*c_h, c_out)
 
+    def conv_block(self, x, first_layer, second_layer, emb, res=True):
+        out = pad_layer(x, first_layer)
+        out = F.leaky_relu(out, negative_slope=self.ns)
+        out = pixel_shuffle_1d(out, upscale_factor=2)
+        out = append_emb(emb, out.size(2), out)
+        out = pad_layer(out, second_layer)
+        out = F.leaky_relu(out, negative_slope=self.ns)
+        if res:
+            x_up = upsample(x, scale_factor=2)
+            out = out + x_up
+        return out
+
+    def dense_block(self, x, layers, res=True):
+        out = x
+        for layer in layers:
+            out = linear(out, layer)
+            out = F.leaky_relu(out, negative_slope=self.ns)
+        if res:
+            out = out + x
+        return out
+
     def forward(self, x, c):
         emb = self.emb(c)
         # conv layer
-        out = conv_block(x, self.conv1, self.conv2, emb, res=True, ns=self.ns)
-        out = conv_block(out, self.conv3, self.conv4, emb, res=True, ns=self.ns)
-        out = conv_block(out, self.conv5, self.conv6, emb, res=True, ns=self.ns)
+        out = self.conv_block(x, self.conv1, self.conv2, emb, res=True )
+        out = self.conv_block(out, self.conv3, self.conv4, emb, res=True)
+        out = self.conv_block(out, self.conv5, self.conv6, emb, res=True)
         # dense layer
-        out_dense1 = linear(out, self.dense1)
-        out_dense1 = F.leaky_relu(out_dense1, negative_slope=self.ns)
-        out_dense2 = linear(out_dense1, self.dense2)
-        out_dense2 = F.leaky_relu(out_dense2, negative_slope=self.ns)
-        out = out_dense2 + out
+        out = self.dense_block(out, [self.dense1, self.dense2], res=True)
+        out = self.dense_block(out, [self.dense3, self.dense4], res=True)
         out_appended = append_emb(emb, out.size(2), out)
         # rnn layer
         out_rnn = RNN(out_appended, self.RNN)
@@ -291,13 +295,13 @@ class Decoder(nn.Module):
         return out
 
 class Encoder(nn.Module):
-    def __init__(self, c_in=513, c_h1=128, c_h2=512, c_h3=256, ns=0.2):
+    def __init__(self, c_in=513, c_h1=256, c_h2=512, c_h3=128, ns=0.2):
         super(Encoder, self).__init__()
         self.ns = ns
         self.conv1s = nn.ModuleList(
                 [nn.Conv1d(c_in, c_h1, kernel_size=k) for k in range(1, 16)]
             )
-        self.conv2 = nn.Conv1d(len(self.conv1s)*c_h1 + c_in, c_h2, kernel_size=3)
+        self.conv2 = nn.Conv1d(len(self.conv1s)*c_h1 + c_in, c_h2, kernel_size=1)
         self.conv3 = nn.Conv1d(c_h2, c_h2, kernel_size=5, stride=2)
         self.conv4 = nn.Conv1d(c_h2, c_h2, kernel_size=5, stride=2)
         self.conv5 = nn.Conv1d(c_h2, c_h2, kernel_size=5, stride=2)
@@ -305,8 +309,22 @@ class Encoder(nn.Module):
         self.dense2 = nn.Linear(c_h2, c_h2)
         self.dense3 = nn.Linear(c_h2, c_h2)
         self.dense4 = nn.Linear(c_h2, c_h2)
-        self.RNN = nn.GRU(input_size=c_h2, hidden_size=c_h3, num_layers=2, bidirectional=True)
+        self.RNN = nn.GRU(input_size=c_h2, hidden_size=c_h3, num_layers=1, bidirectional=True)
         self.linear = nn.Linear(c_h2 + 2*c_h3, c_h2)
+
+    def conv_block(self, x, layer):
+        out = pad_layer(x, layer)
+        out = F.leaky_relu(out, negative_slope=self.ns)
+        return out
+
+    def dense_block(self, x, layers, res=True):
+        out = x
+        for layer in layers:
+            out = linear(out, layer)
+            out = F.leaky_relu(out, negative_slope=self.ns)
+        if res:
+            out = out + x
+        return out
 
     def forward(self, x):
         outs = []
@@ -315,24 +333,13 @@ class Encoder(nn.Module):
             outs.append(out)
         out = torch.cat(outs + [x], dim=1)
         out = F.leaky_relu(out, negative_slope=self.ns)
-        out = pad_layer(out, self.conv2)
-        out = F.leaky_relu(out, negative_slope=self.ns)
-        out = pad_layer(out, self.conv3)
-        out = F.leaky_relu(out, negative_slope=self.ns)
-        out = pad_layer(out, self.conv4)
-        out = F.leaky_relu(out, negative_slope=self.ns)
-        out = pad_layer(out, self.conv5)
-        out = F.leaky_relu(out, negative_slope=self.ns)
-        out_dense1 = linear(out, self.dense1)
-        out_dense1 = F.leaky_relu(out_dense1, negative_slope=self.ns)
-        out_dense2 = linear(out_dense1, self.dense2)
-        out_dense2 = F.leaky_relu(out_dense2, negative_slope=self.ns)
-        out_dense2 = out_dense2 + out
-        out_dense3 = linear(out_dense2, self.dense3)
-        out_dense3 = F.leaky_relu(out_dense3, negative_slope=self.ns)
-        out_dense4 = linear(out_dense3, self.dense4)
-        out_dense4 = F.leaky_relu(out_dense4, negative_slope=self.ns)
-        out = out_dense4 + out_dense2
+        out = self.conv_block(out, self.conv2)
+        out = self.conv_block(out, self.conv3)
+        out = self.conv_block(out, self.conv4)
+        out = self.conv_block(out, self.conv5)
+        # dense layer
+        out = self.dense_block(out, [self.dense1, self.dense2], res=True)
+        out = self.dense_block(out, [self.dense3, self.dense4], res=True)
         out_rnn = RNN(out, self.RNN)
         out = torch.cat([out, out_rnn], dim=1)
         out = linear(out, self.linear)
