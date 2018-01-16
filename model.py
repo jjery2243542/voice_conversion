@@ -250,7 +250,6 @@ def conv_block(x, first_layer, second_layer, emb, res=True, ns=0.2):
     out = F.leaky_relu(out, negative_slope=ns)
     if res:
         x_up = upsample(x, scale_factor=2)
-        print(x_up.size())
         out = out + x_up
     return out
 
@@ -275,7 +274,7 @@ class Decoder(nn.Module):
     def forward(self, x, c):
         emb = self.emb(c)
         # conv layer
-        out = conv_block(x, self.conv1, self.conv2, emb, res=False, ns=self.ns)
+        out = conv_block(x, self.conv1, self.conv2, emb, res=True, ns=self.ns)
         out = conv_block(out, self.conv3, self.conv4, emb, res=True, ns=self.ns)
         out = conv_block(out, self.conv5, self.conv6, emb, res=True, ns=self.ns)
         # dense layer
