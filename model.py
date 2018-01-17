@@ -249,13 +249,13 @@ class Decoder(nn.Module):
         self.conv4 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=5)
         self.conv5 = nn.Conv1d(c_h + emb_size, 2*c_h, kernel_size=5)
         self.conv6 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=5)
-        self.dense1 = nn.Linear(c_h, c_h)
-        self.dense2 = nn.Linear(c_h, c_h)
-        self.dense3 = nn.Linear(c_h, c_h)
-        self.dense4 = nn.Linear(c_h, c_h)
+        self.dense1 = nn.Linear(c_h + emb_size, c_h)
+        self.dense2 = nn.Linear(c_h + emb_size, c_h)
+        self.dense3 = nn.Linear(c_h + emb_size, c_h)
+        self.dense4 = nn.Linear(c_h + emb_size, c_h)
         self.RNN = nn.GRU(input_size=c_h + emb_size, hidden_size=c_h//2, num_layers=1, bidirectional=True)
         self.emb = nn.Embedding(c_a, emb_size)
-        self.linear = nn.Linear(2*c_h, c_out)
+        self.linear = nn.Linear(2*c_h + emb_size, c_out)
 
     def conv_block(self, x, first_layer, second_layer, emb, res=True):
         x_append = append_emb(emb, x.size(2), x)
@@ -270,9 +270,10 @@ class Decoder(nn.Module):
             out = out + x_up
         return out
 
-    def dense_block(self, x, layers, res=True):
+    def dense_block(self, x, emb, layers, res=True):
         out = x
         for layer in layers:
+            out = append_emb(emb, out.size(2), out)
             out = linear(out, layer)
             out = F.leaky_relu(out, negative_slope=self.ns)
         if res:
@@ -286,12 +287,13 @@ class Decoder(nn.Module):
         out = self.conv_block(out, self.conv3, self.conv4, emb, res=True)
         out = self.conv_block(out, self.conv5, self.conv6, emb, res=True)
         # dense layer
-        out = self.dense_block(out, [self.dense1, self.dense2], res=True)
-        out = self.dense_block(out, [self.dense3, self.dense4], res=True)
+        out = self.dense_block(out, emb, [self.dense1, self.dense2], res=True)
+        out = self.dense_block(out, emb, [self.dense3, self.dense4], res=True)
         out_appended = append_emb(emb, out.size(2), out)
         # rnn layer
         out_rnn = RNN(out_appended, self.RNN)
         out = torch.cat([out, out_rnn], dim=1)
+        out = append_emb(emb, out.size(2), out)
         out = linear(out, self.linear)
         return out
 
