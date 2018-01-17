@@ -243,11 +243,11 @@ class Decoder(nn.Module):
     def __init__(self, c_in=512, c_out=513, c_h=512, c_a=8, emb_size=128, ns=0.2):
         super(Decoder, self).__init__()
         self.ns = ns
-        self.conv1 = nn.Conv1d(c_in, 2*c_h, kernel_size=5)
+        self.conv1 = nn.Conv1d(c_in + emb_size, 2*c_h, kernel_size=5)
         self.conv2 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=5)
-        self.conv3 = nn.Conv1d(c_h, 2*c_h, kernel_size=5)
+        self.conv3 = nn.Conv1d(c_h + emb_size, 2*c_h, kernel_size=5)
         self.conv4 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=5)
-        self.conv5 = nn.Conv1d(c_h, 2*c_h, kernel_size=5)
+        self.conv5 = nn.Conv1d(c_h + emb_size, 2*c_h, kernel_size=5)
         self.conv6 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=5)
         self.dense1 = nn.Linear(c_h, c_h)
         self.dense2 = nn.Linear(c_h, c_h)
@@ -258,7 +258,8 @@ class Decoder(nn.Module):
         self.linear = nn.Linear(2*c_h, c_out)
 
     def conv_block(self, x, first_layer, second_layer, emb, res=True):
-        out = pad_layer(x, first_layer)
+        x_append = append_emb(emb, x.size(2), x)
+        out = pad_layer(x_append, first_layer)
         out = F.leaky_relu(out, negative_slope=self.ns)
         out = pixel_shuffle_1d(out, upscale_factor=2)
         out = append_emb(emb, out.size(2), out)
