@@ -171,24 +171,32 @@ class LatentDiscriminator(nn.Module):
         self.conv2 = nn.Conv1d(c_h, c_h, kernel_size=5)
         self.conv3 = nn.Conv1d(c_h, c_h, kernel_size=5)
         self.conv4 = nn.Conv1d(c_h, c_h, kernel_size=5)
-        self.conv5 = nn.Conv1d(c_h, 1, kernel_size=16)
+        self.conv5 = nn.Conv1d(c_h, c_h, kernel_size=5)
+        self.conv6 = nn.Conv1d(c_h, c_h, kernel_size=5)
+        self.conv7 = nn.Conv1d(c_h, 1, kernel_size=16)
         self.drop1 = nn.Dropout(p=dp)
         self.drop2 = nn.Dropout(p=dp)
         self.drop3 = nn.Dropout(p=dp)
-        self.drop4 = nn.Dropout(p=dp)
+        self.ins_norm1 = nn.InstanceNorm1d(c_h)
+        self.ins_norm2 = nn.InstanceNorm1d(c_h)
+        self.ins_norm3 = nn.InstanceNorm1d(c_h)
 
-    def conv_block(self, x, conv_layer, dropout_layer):
-        out = pad_layer(x, conv_layer)
-        out = dropout_layer(out)
-        out = F.leaky_relu(out, negative_slope=self.ns)
+    def conv_block(self, x, conv_layers, after_layers, res=True):
+        out = x
+        for layer in conv_layers:
+            out = pad_layer(out, layer)
+            out = F.leaky_relu(out, negative_slope=self.ns)
+        for layer in after_layers:
+            out = layer(out)
+        if res:
+            out = out + x
         return out
 
     def forward(self, x):
-        out = self.conv_block(x, self.conv1, self.drop1)
-        out = self.conv_block(out, self.conv2, self.drop2)
-        out = self.conv_block(out, self.conv3, self.drop3)
-        out = self.conv_block(out, self.conv4, self.drop4)
-        out = self.conv5(out)
+        out = self.conv_block(x, [self.conv1, self.conv2], [self.ins_norm1, self.drop1], res=False)
+        out = self.conv_block(out, [self.conv3, self.conv4], [self.ins_norm2, self.drop2], res=True)
+        out = self.conv_block(out, [self.conv5, self.conv6], [self.ins_norm3, self.drop3], res=True)
+        out = self.conv7(out)
         out = out.view(out.size()[0], -1)
         mean_value = torch.mean(out, dim=1)
         return mean_value

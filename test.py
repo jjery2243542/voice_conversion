@@ -14,13 +14,13 @@ from scipy.io.wavfile import write
 
 if __name__ == '__main__':
     hps = Hps()
-    hps.load('./hps/v16.json')
+    hps.load('./hps/v18.json')
     hps_tuple = hps.get_tuple()
     dataset = myDataset('/storage/feature/voice_conversion/vctk/log_vctk.h5',\
             '/storage/feature/voice_conversion/vctk/128_513_2000k.json')
     data_loader = DataLoader(dataset)
     solver = Solver(hps_tuple, data_loader)
-    solver.load_model('/storage/model/voice_conversion/ae/ps_log_model.pkl-59999')
+    solver.load_model('/storage/model/voice_conversion/v18/256_8_model.pkl-92000')
     spec = np.loadtxt('./preprocess/test_code/lin.npy')
     spec2 = np.loadtxt('./preprocess/test_code/lin2.npy')
     spec_expand = np.expand_dims(spec, axis=0)
