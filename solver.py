@@ -81,7 +81,13 @@ class Solver(object):
                 self.LatentDiscriminator.load_state_dict(all_model['latent_discriminator'])
                 self.PatchDiscriminator.load_state_dict(all_model['patch_discriminator'])
 
+    def set_eval(self):
+        self.Encoder.eval()
+        self.Decoder.eval()
+        #self.LatentDiscriminator.eval()
+
     def test_step(self, x, c):
+        self.set_eval()
         x = to_var(x).permute(0, 2, 1)
         enc = self.Encoder(x)
         x_tilde = self.Decoder(enc, c)
