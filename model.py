@@ -309,9 +309,12 @@ class Encoder(nn.Module):
                 [nn.Conv1d(c_in, c_h1, kernel_size=k) for k in range(1, 8)]
             )
         self.conv2 = nn.Conv1d(len(self.conv1s)*c_h1 + c_in, c_h2, kernel_size=1)
-        self.conv3 = nn.Conv1d(c_h2, c_h2, kernel_size=5, stride=2)
+        self.conv3 = nn.Conv1d(c_h2, c_h2, kernel_size=5)
         self.conv4 = nn.Conv1d(c_h2, c_h2, kernel_size=5, stride=2)
-        self.conv5 = nn.Conv1d(c_h2, c_h2, kernel_size=5, stride=2)
+        self.conv5 = nn.Conv1d(c_h2, c_h2, kernel_size=5)
+        self.conv6 = nn.Conv1d(c_h2, c_h2, kernel_size=5, stride=2)
+        self.conv7 = nn.Conv1d(c_h2, c_h2, kernel_size=5)
+        self.conv8 = nn.Conv1d(c_h2, c_h2, kernel_size=5, stride=2)
         self.dense1 = nn.Linear(c_h2, c_h2)
         self.dense2 = nn.Linear(c_h2, c_h2)
         self.dense3 = nn.Linear(c_h2, c_h2)
@@ -324,10 +327,15 @@ class Encoder(nn.Module):
         self.ins_norm3 = nn.InstanceNorm1d(c_h2)
         self.ins_norm4 = nn.InstanceNorm1d(c_h2)
 
-    def conv_block(self, x, conv_layer, norm_layer):
-        out = pad_layer(x, conv_layer)
-        out = F.leaky_relu(out, negative_slope=self.ns)
+    def conv_block(self, x, conv_layers, norm_layer, res=True):
+        out = x
+        for layer in conv_layers:
+            out = pad_layer(out, layer)
+            out = F.leaky_relu(out, negative_slope=self.ns)
         out = norm_layer(out)
+        if res:
+            x_down = F.avg_pool1d(x, kernel_size=2)
+            out = x_down + out 
         return out
 
     def dense_block(self, x, layers, res=True):
@@ -346,10 +354,10 @@ class Encoder(nn.Module):
             outs.append(out)
         out = torch.cat(outs + [x], dim=1)
         out = F.leaky_relu(out, negative_slope=self.ns)
-        out = self.conv_block(out, self.conv2, self.ins_norm1)
-        out = self.conv_block(out, self.conv3, self.ins_norm2)
-        out = self.conv_block(out, self.conv4, self.ins_norm3)
-        out = self.conv_block(out, self.conv5, self.ins_norm4)
+        out = self.conv_block(out, [self.conv2], self.ins_norm1, res=False)
+        out = self.conv_block(out, [self.conv3, self.conv4], self.ins_norm2)
+        out = self.conv_block(out, [self.conv5, self.conv6], self.ins_norm3)
+        out = self.conv_block(out, [self.conv7, self.conv8], self.ins_norm4)
         # dense layer
         out = self.dense_block(out, [self.dense1, self.dense2], res=True)
         out = self.dense_block(out, [self.dense3, self.dense4], res=True)
