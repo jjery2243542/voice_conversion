@@ -242,12 +242,12 @@ class Decoder(nn.Module):
     def __init__(self, c_in=512, c_out=513, c_h=512, c_a=8, emb_size=128, ns=0.2):
         super(Decoder, self).__init__()
         self.ns = ns
-        self.conv1 = nn.Conv1d(c_in + emb_size, 2*c_h, kernel_size=5)
-        self.conv2 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=5)
-        self.conv3 = nn.Conv1d(c_h + emb_size, 2*c_h, kernel_size=5)
-        self.conv4 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=5)
-        self.conv5 = nn.Conv1d(c_h + emb_size, 2*c_h, kernel_size=5)
-        self.conv6 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=5)
+        self.conv1 = nn.Conv1d(c_in + emb_size, 2*c_h, kernel_size=3)
+        self.conv2 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=3)
+        self.conv3 = nn.Conv1d(c_h + emb_size, 2*c_h, kernel_size=3)
+        self.conv4 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=3)
+        self.conv5 = nn.Conv1d(c_h + emb_size, 2*c_h, kernel_size=3)
+        self.conv6 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=3)
         self.dense1 = nn.Linear(c_h + emb_size, c_h)
         self.dense2 = nn.Linear(c_h + emb_size, c_h)
         self.dense3 = nn.Linear(c_h + emb_size, c_h)
@@ -259,11 +259,15 @@ class Decoder(nn.Module):
         self.ins_norm1 = nn.InstanceNorm1d(c_h)
         self.ins_norm2 = nn.InstanceNorm1d(c_h)
         self.ins_norm3 = nn.InstanceNorm1d(c_h)
+        self.ins_norm4 = nn.InstanceNorm1d(c_h)
+        self.ins_norm5 = nn.InstanceNorm1d(c_h)
 
     def conv_block(self, x, conv_layers, norm_layer, emb, res=True):
+        # first layer
         x_append = append_emb(emb, x.size(2), x)
         out = pad_layer(x_append, conv_layers[0])
         out = F.leaky_relu(out, negative_slope=self.ns)
+        # upsample by pixelshuffle
         out = pixel_shuffle_1d(out, upscale_factor=2)
         out = append_emb(emb, out.size(2), out)
         out = pad_layer(out, conv_layers[1])
@@ -274,12 +278,13 @@ class Decoder(nn.Module):
             out = out + x_up
         return out
 
-    def dense_block(self, x, emb, layers, res=True):
+    def dense_block(self, x, emb, layers, norm_layer, res=True):
         out = x
         for layer in layers:
             out = append_emb(emb, out.size(2), out)
             out = linear(out, layer)
             out = F.leaky_relu(out, negative_slope=self.ns)
+        out = norm_layer(out)
         if res:
             out = out + x
         return out
@@ -291,8 +296,8 @@ class Decoder(nn.Module):
         out = self.conv_block(out, [self.conv3, self.conv4], self.ins_norm2, emb, res=True)
         out = self.conv_block(out, [self.conv5, self.conv6], self.ins_norm3, emb, res=True)
         # dense layer
-        out = self.dense_block(out, emb, [self.dense1, self.dense2], res=True)
-        out = self.dense_block(out, emb, [self.dense3, self.dense4], res=True)
+        out = self.dense_block(out, emb, [self.dense1, self.dense2], self.ins_norm4, res=True)
+        out = self.dense_block(out, emb, [self.dense3, self.dense4], self.ins_norm5, res=True)
         out_appended = append_emb(emb, out.size(2), out)
         # rnn layer
         out_rnn = RNN(out_appended, self.RNN)
@@ -302,7 +307,7 @@ class Decoder(nn.Module):
         return out
 
 class Encoder(nn.Module):
-    def __init__(self, c_in=513, c_h1=256, c_h2=512, c_h3=128, ns=0.2):
+    def __init__(self, c_in=513, c_h1=128, c_h2=512, c_h3=128, ns=0.2):
         super(Encoder, self).__init__()
         self.ns = ns
         self.conv1s = nn.ModuleList(
@@ -326,6 +331,8 @@ class Encoder(nn.Module):
         self.ins_norm2 = nn.InstanceNorm1d(c_h2)
         self.ins_norm3 = nn.InstanceNorm1d(c_h2)
         self.ins_norm4 = nn.InstanceNorm1d(c_h2)
+        self.ins_norm5 = nn.InstanceNorm1d(c_h2)
+        self.ins_norm6 = nn.InstanceNorm1d(c_h2)
 
     def conv_block(self, x, conv_layers, norm_layer, res=True):
         out = x
@@ -339,11 +346,12 @@ class Encoder(nn.Module):
             out = x_down + out 
         return out
 
-    def dense_block(self, x, layers, res=True):
+    def dense_block(self, x, layers, norm_layer, res=True):
         out = x
         for layer in layers:
             out = linear(out, layer)
             out = F.leaky_relu(out, negative_slope=self.ns)
+        out = norm_layer(out)
         if res:
             out = out + x
         return out
@@ -360,8 +368,8 @@ class Encoder(nn.Module):
         out = self.conv_block(out, [self.conv5, self.conv6], self.ins_norm3)
         out = self.conv_block(out, [self.conv7, self.conv8], self.ins_norm4)
         # dense layer
-        out = self.dense_block(out, [self.dense1, self.dense2], res=True)
-        out = self.dense_block(out, [self.dense3, self.dense4], res=True)
+        out = self.dense_block(out, [self.dense1, self.dense2], self.ins_norm5, res=True)
+        out = self.dense_block(out, [self.dense3, self.dense4], self.ins_norm6, res=True)
         out_rnn = RNN(out, self.RNN)
         out = torch.cat([out, out_rnn], dim=1)
         out = linear(out, self.linear)
