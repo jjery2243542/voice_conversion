@@ -334,7 +334,8 @@ class Encoder(nn.Module):
             out = F.leaky_relu(out, negative_slope=self.ns)
         out = norm_layer(out)
         if res:
-            x_down = F.avg_pool1d(x, kernel_size=2)
+            x_pad = F.pad(x, pad=(0, x.size(2) % 2), mode='reflect')
+            x_down = F.avg_pool1d(x_pad, kernel_size=2)
             out = x_down + out 
         return out
 
