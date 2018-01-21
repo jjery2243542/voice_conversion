@@ -107,7 +107,8 @@ class Sampler(object):
         self.utt2len = self.read_utt_len_file(utt_len_path)
         self.speakers = list(self.f_h5['train'].keys())
         self.n_speaker = n_speaker
-        self.speaker_used = self.female_ids[:n_speaker // 2] + self.male_ids[:n_speaker // 2]
+        #self.speaker_used = self.female_ids[:n_speaker // 2] + self.male_ids[:n_speaker // 2]
+        self.speaker_used = self.accent['English']
         self.speaker2utts = {speaker:list(self.f_h5['train/{}'.format(speaker)].keys()) \
                 for speaker in self.speakers}
         # remove too short utterence
@@ -133,6 +134,7 @@ class Sampler(object):
 
     def read_vctk_speaker_file(self, speaker_info_path):
         self.female_ids, self.male_ids = [], []
+        self.accent = defaultdict(lambda : [])
         with open(speaker_info_path, 'r') as f:
             lines = f.readlines()
             infos = [line.strip().split() for line in lines[1:]]
@@ -141,6 +143,7 @@ class Sampler(object):
                     self.female_ids.append(info[0])
                 else:
                     self.male_ids.append(info[0])
+                self.accent[info[3]].append(info[0])
             
     def read_libre_sex_file(self, speaker_sex_path):
         with open(speaker_sex_path, 'r') as f:
@@ -223,13 +226,14 @@ class DataLoader(object):
         return tuple(batch_tensor)
 
 class myDataset(data.Dataset):
-    def __init__(self, h5_path, index_path, seg_len=64):
+    def __init__(self, h5_path, index_path, dset='train', seg_len=64):
         self.h5 = h5py.File(h5_path, 'r')
         with open(index_path) as f_index:
             self.indexes = json.load(f_index)
         self.indexer = namedtuple('index', ['speaker_i', 'speaker_j', \
                 'i0', 'i1', 'j', 't', 't_k', 't_prime', 't_j'])
         self.seg_len = seg_len
+        self.dset = dset
 
     def __getitem__(self, i):
         index = self.indexes[i]
@@ -239,10 +243,10 @@ class myDataset(data.Dataset):
         t, t_k, t_prime, t_j = index.t, index.t_k, index.t_prime, index.t_j
         seg_len = self.seg_len
         data = [speaker_i, speaker_j]
-        data.append(self.h5[f'train/{i0}/lin'][t:t+seg_len])
-        data.append(self.h5[f'train/{i0}/lin'][t_k:t_k+seg_len])
-        data.append(self.h5[f'train/{i1}/lin'][t_prime:t_prime+seg_len])
-        data.append(self.h5[f'train/{j}/lin'][t_j:t_j+seg_len])
+        data.append(self.h5[f'{self.dset}/{i0}/lin'][t:t+seg_len])
+        data.append(self.h5[f'{self.dset}/{i0}/lin'][t_k:t_k+seg_len])
+        data.append(self.h5[f'{self.dset}/{i1}/lin'][t_prime:t_prime+seg_len])
+        data.append(self.h5[f'{self.dset}/{j}/lin'][t_j:t_j+seg_len])
         return tuple(data)
 
     def __len__(self):
@@ -258,11 +262,12 @@ class Logger(object):
 if __name__ == '__main__':
     hps = Hps()
     hps.dump('./hps/v18.json')
-    dataset = myDataset('/home_local/jjery2243542/voice_conversion/datasets/vctk/vctk.h5',\
-            '/home_local/jjery2243542/voice_conversion/datasets/vctk/128_513_2000k.json')
-    data_loader = DataLoader(dataset)
-    for i, batch in enumerate(data_loader):
-        print(torch.max(batch[2]))
+    dataset = myDataset('/storage/feature/voice_conversion/vctk/vctk.h5',\
+            '/storage/feature/voice_conversion/vctk/128_513_2000k.json')
+    print(dataset[1])
+    #data_loader = DataLoader(dataset)
+    #for i, batch in enumerate(data_loader):
+    #    print(torch.max(batch[2]))
     #sampler = Sampler()
     #for i in range(100):
     #    print(sampler.sample())
