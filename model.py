@@ -100,34 +100,37 @@ def append_emb(emb, expand_size, output):
     return output
 
 class PatchDiscriminator(nn.Module):
-    def __init__(self, c_in=513, n_class=8, ns=0.2, dp=0.3):
+    def __init__(self, n_class=33, ns=0.2, dp=0.1):
         super(PatchDiscriminator, self).__init__()
         self.ns = ns
         self.conv1 = nn.Conv2d(1, 64, kernel_size=5, stride=2)
         self.conv2 = nn.Conv2d(64, 128, kernel_size=5, stride=2)
         self.conv3 = nn.Conv2d(128, 256, kernel_size=5, stride=2)
         self.conv4 = nn.Conv2d(256, 512, kernel_size=5, stride=2)
-        self.conv5 = nn.Conv2d(512, 1, kernel_size=8)
-        self.conv_classify = nn.Conv2d(512, n_class, kernel_size=(33, 8))
-        self.drop1 = nn.Dropout(p=dp)
-        self.drop2 = nn.Dropout(p=dp)
-        self.drop3 = nn.Dropout(p=dp)
-        self.drop4 = nn.Dropout(p=dp)
+        self.conv5 = nn.Conv2d(512, 1, kernel_size=(2, 8))
+        self.conv_classify = nn.Conv2d(512, n_class, kernel_size=(2, 8))
+        self.drop1 = nn.Dropout2d(p=dp)
+        self.drop2 = nn.Dropout2d(p=dp)
+        self.drop3 = nn.Dropout2d(p=dp)
+        self.drop4 = nn.Dropout2d(p=dp)
+        self.ins_norm1 = nn.InstanceNorm2d(self.conv1.out_channels)
+        self.ins_norm2 = nn.InstanceNorm2d(self.conv2.out_channels)
+        self.ins_norm3 = nn.InstanceNorm2d(self.conv3.out_channels)
+        self.ins_norm4 = nn.InstanceNorm2d(self.conv4.out_channels)
+
+    def conv_block(self, x, conv_layer, after_layers):
+        out = pad_layer(x, conv_layer, is_2d=True)
+        out = F.leaky_relu(out, negative_slope=self.ns)
+        for layer in after_layers:
+            out = layer(out)
+        return out 
 
     def forward(self, x, classify=False):
         x = torch.unsqueeze(x, dim=1)
-        out = pad_layer(x, self.conv1, is_2d=True)
-        out = self.drop1(out)
-        out = F.leaky_relu(out, negative_slope=self.ns)
-        out = pad_layer(out, self.conv2, is_2d=True)
-        out = self.drop2(out)
-        out = F.leaky_relu(out, negative_slope=self.ns)
-        out = pad_layer(out, self.conv3, is_2d=True)
-        out = self.drop3(out)
-        out = F.leaky_relu(out, negative_slope=self.ns)
-        out = pad_layer(out, self.conv4, is_2d=True)
-        out = self.drop4(out)
-        out = F.leaky_relu(out, negative_slope=self.ns)
+        out = self.conv_block(x, self.conv1, [self.ins_norm1, self.drop1])
+        out = self.conv_block(out, self.conv2, [self.ins_norm2, self.drop2])
+        out = self.conv_block(out, self.conv3, [self.ins_norm3, self.drop3])
+        out = self.conv_block(out, self.conv4, [self.ins_norm4, self.drop4])
         # GAN output value
         val = pad_layer(out, self.conv5, is_2d=True)
         val = val.view(val.size(0), -1)
@@ -135,8 +138,7 @@ class PatchDiscriminator(nn.Module):
         if classify:
             # classify
             logits = self.conv_classify(out)
-            logits = logits.view(logits.size()[0], -1)
-            logits = F.log_softmax(logits, dim=1)
+            logits = logits.view(logits.size(0), -1)
             return mean_val, logits
         else:
             return mean_val
@@ -247,7 +249,7 @@ class CBHG(nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self, c_in=512, c_out=513, c_h=512, c_a=8, emb_size=128, ns=0.2):
+    def __init__(self, c_in=512, c_out=26, c_h=512, c_a=8, emb_size=128, ns=0.2):
         super(Decoder, self).__init__()
         self.ns = ns
         self.conv1 = nn.Conv1d(c_in + emb_size, 2*c_h, kernel_size=3)
@@ -315,7 +317,7 @@ class Decoder(nn.Module):
         return out
 
 class Encoder(nn.Module):
-    def __init__(self, c_in=513, c_h1=128, c_h2=512, c_h3=128, ns=0.2):
+    def __init__(self, c_in=26, c_h1=128, c_h2=512, c_h3=128, ns=0.2):
         super(Encoder, self).__init__()
         self.ns = ns
         self.conv1s = nn.ModuleList(
@@ -385,20 +387,20 @@ class Encoder(nn.Module):
         return out
 
 if __name__ == '__main__':
-    E1, E2 = Encoder(513).cuda(), Encoder(513).cuda()
+    E1, E2 = Encoder().cuda(), Encoder().cuda()
     D = Decoder().cuda()
     C = LatentDiscriminator().cuda()
     P = PatchDiscriminator().cuda()
-    S = SpeakerClassifier().cuda()
-    cbhg = CBHG().cuda()
-    inp = Variable(torch.randn(16, 513, 128)).cuda()
+    #S = SpeakerClassifier().cuda()
+    #cbhg = CBHG().cuda()
+    inp = Variable(torch.randn(16, 26, 128)).cuda()
     e1 = E1(inp)
-    e2 = E2(inp)
-    s1 = S(e1)
+    print(e1.size())
+    #s1 = S(e1)
     c = Variable(torch.from_numpy(np.random.randint(8, size=(16)))).cuda()
     d = D(e1, c)
     print(d.size())
     p1, p2 = P(d, classify=True)
     print(p1.size(), p2.size())
-    c = C(torch.cat([e2,e2],dim=1))
+    c = C(torch.cat([e1, e1],dim=1))
     print(c.size())
