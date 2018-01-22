@@ -265,9 +265,8 @@ class Logger(object):
 if __name__ == '__main__':
     hps = Hps()
     hps.dump('./hps/v18.json')
-    dataset = myDataset('/storage/feature/voice_conversion/vctk/vctk.h5',\
-            '/storage/feature/voice_conversion/vctk/128_513_2000k.json')
-    print(dataset[1])
+    #dataset = myDataset('/home_local/jjery2243542/voice_conversion/datasets/vctk/vctk.h5',\
+    #        '/home_local/jjery2243542/voice_conversion/datasets/vctk/128_513_2000k.json')
     #data_loader = DataLoader(dataset)
     #for i, batch in enumerate(data_loader):
     #    print(torch.max(batch[2]))
