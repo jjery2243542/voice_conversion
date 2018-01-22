@@ -164,7 +164,7 @@ class SpeakerClassifier(nn.Module):
         return logits 
 
 class LatentDiscriminator(nn.Module):
-    def __init__(self, c_in=1024, c_h=512, ns=0.2, dp=0.3):
+    def __init__(self, c_in=1024, c_h=512, ns=0.2, dp=0.1):
         super(LatentDiscriminator, self).__init__()
         self.ns = ns
         self.conv1 = nn.Conv1d(c_in, c_h, kernel_size=5)

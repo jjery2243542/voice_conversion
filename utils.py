@@ -92,24 +92,26 @@ class Hps(object):
 class Sampler(object):
     def __init__(
         self, 
-        h5_path='/storage/raw_feature/voice_conversion/vctk/vctk.h5', 
-        speaker_info_path='/storage/raw_feature/voice_conversion/vctk/speaker-info.txt', 
-        utt_len_path='/storage/raw_feature/voice_conversion/vctk/vctk_length.txt', 
+        h5_path='/storage/feature/voice_conversion/vctk/vctk.h5', 
+        speaker_info_path='/storage/feature/voice_conversion/vctk/speaker-info.txt', 
+        utt_len_path='/storage/feature/voice_conversion/vctk/vctk_length.txt',
+        dset='train',
         max_step=5, 
         seg_len=64,
         n_speaker=8,
     ):
+        self.dset = dset
         self.f_h5 = h5py.File(h5_path, 'r')
         self.max_step = max_step
         self.seg_len = seg_len
         #self.read_sex_file(speaker_sex_path)
         self.read_vctk_speaker_file(speaker_info_path)
         self.utt2len = self.read_utt_len_file(utt_len_path)
-        self.speakers = list(self.f_h5['train'].keys())
+        self.speakers = list(self.f_h5[dset].keys())
         self.n_speaker = n_speaker
-        #self.speaker_used = self.female_ids[:n_speaker // 2] + self.male_ids[:n_speaker // 2]
-        self.speaker_used = self.accent['English']
-        self.speaker2utts = {speaker:list(self.f_h5['train/{}'.format(speaker)].keys()) \
+        self.speaker_used = self.female_ids[:n_speaker // 2] + self.male_ids[:n_speaker // 2]
+        #self.speaker_used = self.accent['English']
+        self.speaker2utts = {speaker:list(self.f_h5[f'{dset}/{speaker}'].keys()) \
                 for speaker in self.speakers}
         # remove too short utterence
         self.rm_too_short_utt()
@@ -129,7 +131,7 @@ class Sampler(object):
         if not limit:
             limit = self.seg_len * 2
         for (speaker, utt_id), length in self.utt2len.items():
-            if length < limit:
+            if length < limit and utt_id in self.speaker2utts[speaker]:
                 self.speaker2utts[speaker].remove(utt_id)
 
     def read_vctk_speaker_file(self, speaker_info_path):
@@ -156,8 +158,9 @@ class Sampler(object):
 
     def sample_utt(self, speaker_id, n_samples=1):
         # sample an utterence
+        dset = self.dset
         utt_ids = random.sample(self.speaker2utts[speaker_id], n_samples)
-        lengths = [self.f_h5[f'train/{speaker_id}/{utt_id}/mel'].shape[0] for utt_id in utt_ids]
+        lengths = [self.f_h5[f'{dset}/{speaker_id}/{utt_id}/mel'].shape[0] for utt_id in utt_ids]
         return [(utt_id, length) for utt_id, length in zip(utt_ids, lengths)]
 
     def rand(self, l):

@@ -9,13 +9,13 @@ max_step=5
 seg_len=32
 mel_band=80
 lin_band=513
-n_samples=2000000
+n_samples=200
 
 if __name__ == '__main__':
     if len(sys.argv) < 3:
         print('usage: python3 make_samples.py [in_h5py_path] [out_json_path]')
         exit(0)
-    sampler = Sampler(sys.argv[1], max_step=max_step, seg_len=seg_len)
+    sampler = Sampler(sys.argv[1], max_step=max_step, seg_len=seg_len, dset='test')
     samples = [sampler.sample()._asdict() for _ in range(n_samples)]
     with open(sys.argv[2], 'w') as f_json:
         json.dump(samples, f_json, indent=4, separators=(',', ': '))
