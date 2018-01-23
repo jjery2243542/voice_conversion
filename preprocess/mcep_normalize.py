@@ -5,7 +5,7 @@ if __name__ == '__main__':
     in_h5py_path=sys.argv[1]
     out_h5py_path=sys.argv[2]
 
-    with h5py.File(in_h5py_path, 'r') as f_in, h5py.File(out_h5py_path, 'w') as f_out:
+    with h5py.File(in_h5py_path, 'r+') as f_in, h5py.File(out_h5py_path, 'w') as f_out:
         for speaker in f_in['train'].keys():
             print(f'processing speaker_id={speaker}')
             # normalized f0
@@ -25,4 +25,12 @@ if __name__ == '__main__':
             f_out.create_dataset(f'{speaker}/mc_mean', data=mc_mean, dtype=np.float32)
             f_out.create_dataset(f'{speaker}/mc_std', data=mc_std, dtype=np.float32)
 
-        
+       
+       for speaker in f_in['train'].keys():
+           print(f'normalize speaker_id={speaker}')
+           mc_mean = f_out[f'{speaker}/mc_mean'][:] 
+           mc_std = f_out[f'{speaker}/mc_std'][:]
+           for dset in ['train', 'test']:
+               mc = f_in[f'{dset}/{speaker}/{utt_id}/mc'][:]
+               norm_mc = (mc - mc_mean) / mc_std
+               f_in.create_dataset(f'{speaker}/norm_mc', data=norm_mc, dtype=np.float32)
