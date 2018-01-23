@@ -89,6 +89,14 @@ class Hps(object):
         with open(path, 'w') as f_json:
             json.dump(self._hps._asdict(), f_json, indent=4, separators=(',', ': '))
 
+class Indexer(object):
+    def __init__(self, h5_path='/storage/feature/voice_conversion/vctk/en_mcep_vctk.h5'):
+        self.h5 = h5py.File(h5_path, 'r')
+
+    def index(self, speaker_id, utt_id, dset='train', feature='mc'):
+        return self.h5[f'{dset}/{speaker_id}/{utt_id}/{feature}'][:]
+        
+
 class Sampler(object):
     def __init__(
         self, 

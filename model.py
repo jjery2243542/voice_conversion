@@ -264,6 +264,7 @@ class Decoder(nn.Module):
         self.dense4 = nn.Linear(c_h + emb_size, c_h)
         self.RNN = nn.GRU(input_size=c_h + emb_size, hidden_size=c_h//2, num_layers=1, bidirectional=True)
         self.emb = nn.Embedding(c_a, emb_size)
+        self.dense5 = nn.Linear(2*c_h + emb_size, c_h)
         self.linear = nn.Linear(2*c_h + emb_size, c_out)
         # normalization layer
         self.ins_norm1 = nn.InstanceNorm1d(c_h)
@@ -313,6 +314,8 @@ class Decoder(nn.Module):
         out_rnn = RNN(out_appended, self.RNN)
         out = torch.cat([out, out_rnn], dim=1)
         out = append_emb(emb, out.size(2), out)
+        out = linear(out, self.dense5)
+        out = F.leaky_relu(out, negative_slope=self.ns)
         out = linear(out, self.linear)
         return out
 
