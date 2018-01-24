@@ -204,7 +204,7 @@ class LatentDiscriminator(nn.Module):
         return mean_value
 
 class CBHG(nn.Module):
-    def __init__(self, c_in=80, c_out=513):
+    def __init__(self, c_in=80, c_out=26):
         super(CBHG, self).__init__()
         self.conv1s = nn.ModuleList(
                 [nn.Conv1d(c_in, 128, kernel_size=k) for k in range(1, 9)]
@@ -265,7 +265,7 @@ class Decoder(nn.Module):
         self.RNN = nn.GRU(input_size=c_h + emb_size, hidden_size=c_h//2, num_layers=1, bidirectional=True)
         self.emb = nn.Embedding(c_a, emb_size)
         self.dense5 = nn.Linear(2*c_h + emb_size, c_h)
-        self.linear = nn.Linear(2*c_h + emb_size, c_out)
+        self.linear = nn.Linear(c_h, c_out)
         # normalization layer
         self.ins_norm1 = nn.InstanceNorm1d(c_h)
         self.ins_norm2 = nn.InstanceNorm1d(c_h)
