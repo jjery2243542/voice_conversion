@@ -100,12 +100,12 @@ class Indexer(object):
 class Sampler(object):
     def __init__(
         self, 
-        h5_path='/storage/feature/voice_conversion/vctk/vctk.h5', 
+        h5_path='/storage/feature/voice_conversion/vctk/en_norm_mcep_vctk.h5', 
         speaker_info_path='/storage/feature/voice_conversion/vctk/speaker-info.txt', 
-        utt_len_path='/storage/feature/voice_conversion/vctk/vctk_length.txt',
+        utt_len_path='/storage/feature/voice_conversion/vctk/mc_length.txt',
         dset='train',
         max_step=5, 
-        seg_len=64,
+        seg_len=128,
         n_speaker=8,
     ):
         self.dset = dset
@@ -117,7 +117,8 @@ class Sampler(object):
         self.utt2len = self.read_utt_len_file(utt_len_path)
         self.speakers = list(self.f_h5[dset].keys())
         self.n_speaker = n_speaker
-        self.speaker_used = self.female_ids[:n_speaker // 2] + self.male_ids[:n_speaker // 2]
+        #self.speaker_used = self.female_ids[:n_speaker // 2] + self.male_ids[:n_speaker // 2]
+        self.speaker_used = ['225', '226', '227', '228', '229', '230', '232', '243']
         #self.speaker_used = self.accent['English']
         self.speaker2utts = {speaker:list(self.f_h5[f'{dset}/{speaker}'].keys()) \
                 for speaker in self.speakers}
@@ -168,7 +169,7 @@ class Sampler(object):
         # sample an utterence
         dset = self.dset
         utt_ids = random.sample(self.speaker2utts[speaker_id], n_samples)
-        lengths = [self.f_h5[f'{dset}/{speaker_id}/{utt_id}/mel'].shape[0] for utt_id in utt_ids]
+        lengths = [self.f_h5[f'{dset}/{speaker_id}/{utt_id}/norm_mc'].shape[0] for utt_id in utt_ids]
         return [(utt_id, length) for utt_id, length in zip(utt_ids, lengths)]
 
     def rand(self, l):
@@ -254,10 +255,10 @@ class myDataset(data.Dataset):
         t, t_k, t_prime, t_j = index.t, index.t_k, index.t_prime, index.t_j
         seg_len = self.seg_len
         data = [speaker_i, speaker_j]
-        data.append(self.h5[f'{self.dset}/{i0}/lin'][t:t+seg_len])
-        data.append(self.h5[f'{self.dset}/{i0}/lin'][t_k:t_k+seg_len])
-        data.append(self.h5[f'{self.dset}/{i1}/lin'][t_prime:t_prime+seg_len])
-        data.append(self.h5[f'{self.dset}/{j}/lin'][t_j:t_j+seg_len])
+        data.append(self.h5[f'{self.dset}/{i0}/norm_mc'][t:t+seg_len])
+        data.append(self.h5[f'{self.dset}/{i0}/norm_mc'][t_k:t_k+seg_len])
+        data.append(self.h5[f'{self.dset}/{i1}/norm_mc'][t_prime:t_prime+seg_len])
+        data.append(self.h5[f'{self.dset}/{j}/norm_mc'][t_j:t_j+seg_len])
         return tuple(data)
 
     def __len__(self):

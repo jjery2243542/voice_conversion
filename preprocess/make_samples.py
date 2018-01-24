@@ -9,7 +9,7 @@ max_step=5
 seg_len=32
 mel_band=80
 lin_band=513
-n_samples=200
+n_samples=2000000
 
 if __name__ == '__main__':
     if len(sys.argv) < 3:
