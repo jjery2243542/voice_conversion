@@ -35,19 +35,19 @@ class Solver(object):
         emb_size = self.hps.emb_size
         self.Encoder = Encoder(ns=ns)
         self.Decoder = Decoder(ns=ns, emb_size=emb_size)
-        #self.Generator = Decoder(ns=ns, emb_size=emb_size)
+        self.Generator = Decoder(ns=ns, emb_size=emb_size)
         self.LatentDiscriminator = LatentDiscriminator(ns=ns)
         self.PatchDiscriminator = PatchDiscriminator(ns=ns)
         if torch.cuda.is_available():
             self.Encoder.cuda()
             self.Decoder.cuda()
-            #self.Generator.cuda()
+            self.Generator.cuda()
             self.LatentDiscriminator.cuda()
             self.PatchDiscriminator.cuda()
         betas = (0.5, 0.9)
         params = list(self.Encoder.parameters()) + list(self.Decoder.parameters())
         self.ae_opt = optim.Adam(params, lr=self.hps.lr, betas=betas)
-        #self.gen_opt = optim.Adam(self.Generator.parameters(), lr=self.hps.lr, betas=betas)
+        self.gen_opt = optim.Adam(self.Generator.parameters(), lr=self.hps.lr, betas=betas)
         self.lat_opt = optim.Adam(self.LatentDiscriminator.parameters(), lr=self.hps.lr, betas=betas)
         self.patch_opt = optim.Adam(self.PatchDiscriminator.parameters(), lr=self.hps.lr, betas=betas)
 
@@ -56,7 +56,7 @@ class Solver(object):
             all_model = {
                 'encoder': self.Encoder.state_dict(),
                 'decoder': self.Decoder.state_dict(),
-                #'generator': self.Generator.state_dict(),
+                'generator': self.Generator.state_dict(),
                 'latent_discriminator': self.LatentDiscriminator.state_dict(),
                 'patch_discriminator': self.PatchDiscriminator.state_dict(),
             }
@@ -64,7 +64,7 @@ class Solver(object):
             all_model = {
                 'encoder': self.Encoder.state_dict(),
                 'decoder': self.Decoder.state_dict(),
-                #'generator': self.Generator.state_dict(),
+                'generator': self.Generator.state_dict(),
             }
         new_model_path = '{}-{}'.format(model_path, iteration)
         with open(new_model_path, 'wb') as f_out:
@@ -89,7 +89,7 @@ class Solver(object):
     def set_eval(self):
         self.Encoder.eval()
         self.Decoder.eval()
-        #self.Generator.eval()
+        self.Generator.eval()
         #self.LatentDiscriminator.eval()
 
     def test_step(self, x, c):

@@ -56,7 +56,7 @@ class Hps(object):
             'alpha_dis',
             'alpha_enc',
             'beta_dis', 
-            'beta_dec', 
+            'beta_gen', 
             'beta_clf',
             'lambda_',
             'ns', 
@@ -65,6 +65,7 @@ class Hps(object):
             'max_step',
             'seg_len',
             'emb_size',
+            'n_speakers',
             'n_latent_steps',
             'n_patch_steps', 
             'batch_size',
@@ -74,7 +75,7 @@ class Hps(object):
             ]
         )
         default = \
-            [1e-4, 1e-2, 1e-4, 1e-3, 1e-4, 1e-4, 10, 0.01, 0.0, 5, 5, 128, 128, 5, 5, 32, 50000, 50000, 60000]
+            [1e-4, 1e-4, 1e-4, 1e-3, 1e-4, 1e-4, 10, 0.01, 0.0, 5, 5, 128, 128, 8, 5, 5, 32, 50000, 50000, 60000]
         self._hps = self.hps._make(default)
 
     def get_tuple(self):
@@ -140,7 +141,7 @@ class Sampler(object):
         if not limit:
             limit = self.seg_len * 2
         for (speaker, utt_id), length in self.utt2len.items():
-            if length < limit and utt_id in self.speaker2utts[speaker]:
+            if length <= limit and utt_id in self.speaker2utts[speaker]:
                 self.speaker2utts[speaker].remove(utt_id)
 
     def read_vctk_speaker_file(self, speaker_info_path):
@@ -238,7 +239,7 @@ class DataLoader(object):
         return tuple(batch_tensor)
 
 class myDataset(data.Dataset):
-    def __init__(self, h5_path, index_path, dset='train', seg_len=64):
+    def __init__(self, h5_path, index_path, dset='train', seg_len=128):
         self.h5 = h5py.File(h5_path, 'r')
         with open(index_path) as f_index:
             self.indexes = json.load(f_index)
@@ -273,9 +274,9 @@ class Logger(object):
 
 if __name__ == '__main__':
     hps = Hps()
-    hps.dump('./hps/v18.json')
-    #dataset = myDataset('/home_local/jjery2243542/voice_conversion/datasets/vctk/vctk.h5',\
-    #        '/home_local/jjery2243542/voice_conversion/datasets/vctk/128_513_2000k.json')
+    hps.dump('./hps/v19.json')
+    #dataset = myDataset('/storage/feature/voice_conversion/vctk/en_norm_mcep_vctk.h5',\
+    #        '/storage/feature/voice_conversion/vctk/mc_128_26_2000k.json')
     #data_loader = DataLoader(dataset)
     #for i, batch in enumerate(data_loader):
     #    print(torch.max(batch[2]))
