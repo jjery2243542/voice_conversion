@@ -107,16 +107,20 @@ class PatchDiscriminator(nn.Module):
         self.conv2 = nn.Conv2d(64, 128, kernel_size=5, stride=2)
         self.conv3 = nn.Conv2d(128, 256, kernel_size=5, stride=2)
         self.conv4 = nn.Conv2d(256, 512, kernel_size=5, stride=2)
-        self.conv5 = nn.Conv2d(512, 1, kernel_size=(2, 8))
-        self.conv_classify = nn.Conv2d(512, n_class, kernel_size=(2, 8))
+        self.conv5 = nn.Conv2d(512, 512, kernel_size=5, stride=2)
+        self.conv6 = nn.Conv2d(512, 1, kernel_size=1)
+        #self.conv_classify = nn.Conv2d(512, n_class, kernel_size=(17, 4))
+        self.conv_classify = nn.Conv2d(512, n_class, kernel_size=(17, 4))
         self.drop1 = nn.Dropout2d(p=dp)
         self.drop2 = nn.Dropout2d(p=dp)
         self.drop3 = nn.Dropout2d(p=dp)
         self.drop4 = nn.Dropout2d(p=dp)
+        self.drop5 = nn.Dropout2d(p=dp)
         self.ins_norm1 = nn.InstanceNorm2d(self.conv1.out_channels)
         self.ins_norm2 = nn.InstanceNorm2d(self.conv2.out_channels)
         self.ins_norm3 = nn.InstanceNorm2d(self.conv3.out_channels)
         self.ins_norm4 = nn.InstanceNorm2d(self.conv4.out_channels)
+        self.ins_norm5 = nn.InstanceNorm2d(self.conv5.out_channels)
 
     def conv_block(self, x, conv_layer, after_layers):
         out = pad_layer(x, conv_layer, is_2d=True)
@@ -131,57 +135,42 @@ class PatchDiscriminator(nn.Module):
         out = self.conv_block(out, self.conv2, [self.ins_norm2, self.drop2])
         out = self.conv_block(out, self.conv3, [self.ins_norm3, self.drop3])
         out = self.conv_block(out, self.conv4, [self.ins_norm4, self.drop4])
+        out = self.conv_block(out, self.conv5, [self.ins_norm5, self.drop5])
         # GAN output value
-        val = pad_layer(out, self.conv5, is_2d=True)
+        val = pad_layer(out, self.conv6, is_2d=True)
         val = val.view(val.size(0), -1)
         mean_val = torch.mean(val, dim=1)
         if classify:
             # classify
             logits = self.conv_classify(out)
+            print(logits.size())
             logits = logits.view(logits.size(0), -1)
             return mean_val, logits
         else:
             return mean_val
 
 class SpeakerClassifier(nn.Module):
-    def __init__(self, c_in=512, c_h=512, n_class=8):
+    def __init__(self, c_in=512, c_h=512, n_class=8, dp=0.1, ns=0.01):
         super(SpeakerClassifier, self).__init__()
-        self.conv1 = nn.Conv1d(c_in, c_h, kernel_size=5)
-        self.conv2 = nn.Conv1d(c_h, c_h, kernel_size=5)
-        self.conv3 = nn.Conv1d(c_h, c_h, kernel_size=5)
-        self.conv4 = nn.Conv1d(c_h, c_h, kernel_size=5)
-        self.conv5 = nn.Conv1d(c_h, n_class, kernel_size=16)
-
-    def forward(self, x):
-        out1 = pad_layer(x, self.conv1)
-        out1 = F.relu(out1)
-        out2 = pad_layer(out1, self.conv2)
-        out2 = F.relu(out2)
-        out3 = pad_layer(out2, self.conv3)
-        out3 = F.relu(out3)
-        out4 = pad_layer(out3, self.conv4)
-        out4 = F.relu(out4)
-        logits = self.conv5(out4)
-        logits = logits.view(logits.size(0), -1)
-        return logits 
-
-class LatentDiscriminator(nn.Module):
-    def __init__(self, c_in=1024, c_h=512, ns=0.2, dp=0.1):
-        super(LatentDiscriminator, self).__init__()
-        self.ns = ns
+        self.dp, self.ns = dp, ns
         self.conv1 = nn.Conv1d(c_in, c_h, kernel_size=5)
         self.conv2 = nn.Conv1d(c_h, c_h, kernel_size=5)
         self.conv3 = nn.Conv1d(c_h, c_h, kernel_size=5)
         self.conv4 = nn.Conv1d(c_h, c_h, kernel_size=5)
         self.conv5 = nn.Conv1d(c_h, c_h, kernel_size=5)
         self.conv6 = nn.Conv1d(c_h, c_h, kernel_size=5)
-        self.conv7 = nn.Conv1d(c_h, 1, kernel_size=16)
+        self.conv6 = nn.Conv1d(c_h, c_h, kernel_size=5)
+        self.conv7 = nn.Conv1d(c_h, c_h, kernel_size=5)
+        self.conv8 = nn.Conv1d(c_h, c_h, kernel_size=5)
+        self.conv9 = nn.Conv1d(c_h, n_class, kernel_size=16)
         self.drop1 = nn.Dropout(p=dp)
         self.drop2 = nn.Dropout(p=dp)
         self.drop3 = nn.Dropout(p=dp)
+        self.drop4 = nn.Dropout(p=dp)
         self.ins_norm1 = nn.InstanceNorm1d(c_h)
         self.ins_norm2 = nn.InstanceNorm1d(c_h)
         self.ins_norm3 = nn.InstanceNorm1d(c_h)
+        self.ins_norm4 = nn.InstanceNorm1d(c_h)
 
     def conv_block(self, x, conv_layers, after_layers, res=True):
         out = x
@@ -198,13 +187,57 @@ class LatentDiscriminator(nn.Module):
         out = self.conv_block(x, [self.conv1, self.conv2], [self.ins_norm1, self.drop1], res=False)
         out = self.conv_block(out, [self.conv3, self.conv4], [self.ins_norm2, self.drop2], res=True)
         out = self.conv_block(out, [self.conv5, self.conv6], [self.ins_norm3, self.drop3], res=True)
-        out = self.conv7(out)
+        out = self.conv_block(out, [self.conv7, self.conv8], [self.ins_norm4, self.drop4], res=True)
+        out = self.conv9(out)
+        out = out.view(out.size()[0], -1)
+        return out
+
+class LatentDiscriminator(nn.Module):
+    def __init__(self, c_in=1024, c_h=512, ns=0.2, dp=0.1):
+        super(LatentDiscriminator, self).__init__()
+        self.ns = ns
+        self.conv1 = nn.Conv1d(c_in, c_h, kernel_size=5)
+        self.conv2 = nn.Conv1d(c_h, c_h, kernel_size=5)
+        self.conv3 = nn.Conv1d(c_h, c_h, kernel_size=5)
+        self.conv4 = nn.Conv1d(c_h, c_h, kernel_size=5)
+        self.conv5 = nn.Conv1d(c_h, c_h, kernel_size=5)
+        self.conv6 = nn.Conv1d(c_h, c_h, kernel_size=5)
+        self.conv6 = nn.Conv1d(c_h, c_h, kernel_size=5)
+        self.conv7 = nn.Conv1d(c_h, c_h, kernel_size=5)
+        self.conv8 = nn.Conv1d(c_h, c_h, kernel_size=5)
+        self.conv9 = nn.Conv1d(c_h, 1, kernel_size=16)
+        self.drop1 = nn.Dropout(p=dp)
+        self.drop2 = nn.Dropout(p=dp)
+        self.drop3 = nn.Dropout(p=dp)
+        self.drop4 = nn.Dropout(p=dp)
+        self.ins_norm1 = nn.InstanceNorm1d(c_h)
+        self.ins_norm2 = nn.InstanceNorm1d(c_h)
+        self.ins_norm3 = nn.InstanceNorm1d(c_h)
+        self.ins_norm4 = nn.InstanceNorm1d(c_h)
+
+    def conv_block(self, x, conv_layers, after_layers, res=True):
+        out = x
+        for layer in conv_layers:
+            out = pad_layer(out, layer)
+            out = F.leaky_relu(out, negative_slope=self.ns)
+        for layer in after_layers:
+            out = layer(out)
+        if res:
+            out = out + x
+        return out
+
+    def forward(self, x):
+        out = self.conv_block(x, [self.conv1, self.conv2], [self.ins_norm1, self.drop1], res=False)
+        out = self.conv_block(out, [self.conv3, self.conv4], [self.ins_norm2, self.drop2], res=True)
+        out = self.conv_block(out, [self.conv5, self.conv6], [self.ins_norm3, self.drop3], res=True)
+        out = self.conv_block(out, [self.conv7, self.conv8], [self.ins_norm4, self.drop4], res=True)
+        out = self.conv9(out)
         out = out.view(out.size()[0], -1)
         mean_value = torch.mean(out, dim=1)
         return mean_value
 
 class CBHG(nn.Module):
-    def __init__(self, c_in=80, c_out=26):
+    def __init__(self, c_in=80, c_out=513):
         super(CBHG, self).__init__()
         self.conv1s = nn.ModuleList(
                 [nn.Conv1d(c_in, 128, kernel_size=k) for k in range(1, 9)]
@@ -249,7 +282,7 @@ class CBHG(nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self, c_in=512, c_out=26, c_h=512, c_a=8, emb_size=128, ns=0.2):
+    def __init__(self, c_in=512, c_out=513, c_h=512, c_a=8, emb_size=128, ns=0.2):
         super(Decoder, self).__init__()
         self.ns = ns
         self.conv1 = nn.Conv1d(c_in + emb_size, 2*c_h, kernel_size=3)
@@ -320,7 +353,7 @@ class Decoder(nn.Module):
         return out
 
 class Encoder(nn.Module):
-    def __init__(self, c_in=26, c_h1=128, c_h2=512, c_h3=128, ns=0.2):
+    def __init__(self, c_in=513, c_h1=128, c_h2=512, c_h3=128, ns=0.2):
         super(Encoder, self).__init__()
         self.ns = ns
         self.conv1s = nn.ModuleList(
@@ -396,7 +429,7 @@ if __name__ == '__main__':
     P = PatchDiscriminator().cuda()
     #S = SpeakerClassifier().cuda()
     #cbhg = CBHG().cuda()
-    inp = Variable(torch.randn(16, 26, 128)).cuda()
+    inp = Variable(torch.randn(16, 513, 128)).cuda()
     e1 = E1(inp)
     print(e1.size())
     #s1 = S(e1)

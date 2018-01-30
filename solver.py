@@ -31,13 +31,14 @@ class Solver(object):
         self.logger = Logger(log_dir)
 
     def build_model(self):
+        hps = self.hps
         ns = self.hps.ns
         emb_size = self.hps.emb_size
         self.Encoder = Encoder(ns=ns)
-        self.Decoder = Decoder(ns=ns, emb_size=emb_size)
-        self.Generator = Decoder(ns=ns, emb_size=emb_size)
+        self.Decoder = Decoder(ns=ns, c_a=hps.n_speakers, emb_size=emb_size)
+        self.Generator = Decoder(ns=ns, c_a=hps.n_speakers, emb_size=emb_size)
         self.LatentDiscriminator = LatentDiscriminator(ns=ns)
-        self.PatchDiscriminator = PatchDiscriminator(ns=ns)
+        self.PatchDiscriminator = PatchDiscriminator(ns=ns, n_class=hps.n_speakers)
         if torch.cuda.is_available():
             self.Encoder.cuda()
             self.Decoder.cuda()
@@ -81,7 +82,7 @@ class Solver(object):
             all_model = torch.load(f_in)
             self.Encoder.load_state_dict(all_model['encoder'])
             self.Decoder.load_state_dict(all_model['decoder'])
-            self.Genrator.load_state_dict(all_model['generator'])
+            #self.Genrator.load_state_dict(all_model['generator'])
             if not enc_only:
                 self.LatentDiscriminator.load_state_dict(all_model['latent_discriminator'])
                 self.PatchDiscriminator.load_state_dict(all_model['patch_discriminator'])
