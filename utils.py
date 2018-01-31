@@ -75,12 +75,13 @@ class Hps(object):
             'n_patch_steps', 
             'batch_size',
             'lat_sched_iters',
+            'pretrain_iters',
             'patch_start_iter', 
             'iters',
             ]
         )
         default = \
-            [1e-4, 1e-4, 1e-4, 1e-3, 1e-4, 1e-4, 10, 0.01, 0.0, 5, 5, 128, 128, 8, 5, 5, 32, 50000, 50000, 60000]
+            [1e-4, 1e-4, 1e-4, 1e-3, 1e-4, 1e-4, 10, 0.01, 0.0, 5, 5, 128, 128, 8, 5, 5, 32, 50000, 5000, 50000, 60000]
         self._hps = self.hps._make(default)
 
     def get_tuple(self):
@@ -295,7 +296,7 @@ class Logger(object):
 
 if __name__ == '__main__':
     hps = Hps()
-    hps.dump('./hps/v19.json')
+    hps.dump('./hps/v20.json')
     #dataset = myDataset('/storage/feature/voice_conversion/vctk/en_norm_mcep_vctk.h5',\
     #        '/storage/feature/voice_conversion/vctk/mc_128_26_2000k.json')
     #data_loader = DataLoader(dataset)

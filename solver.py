@@ -165,30 +165,31 @@ class Solver(object):
             # calculate current alpha
             if iteration + 1 < hps.lat_sched_iters:
                 current_alpha = hps.alpha_enc * (iteration + 1) / hps.lat_sched_iters
-            for step in range(hps.n_latent_steps):
-                #===================== Train latent discriminator =====================#
-                data = next(self.data_loader)
-                (c_i, c_j), (x_i_t, x_i_tk, x_i_prime, x_j) = self.permute_data(data)
-                # encode
-                enc_i_t, enc_i_tk, enc_i_prime, enc_j = self.encode_step(x_i_t, x_i_tk, x_i_prime, x_j)
-                # latent discriminate
-                latent_w_dis, latent_gp = self.latent_discriminate_step(enc_i_t, enc_i_tk, enc_i_prime, enc_j)
-                lat_loss = -hps.alpha_dis * latent_w_dis + hps.lambda_ * latent_gp
-                reset_grad([self.LatentDiscriminator])
-                lat_loss.backward()
-                grad_clip([self.LatentDiscriminator], self.hps.max_grad_norm)
-                self.lat_opt.step()
-                # print info
-                info = {
-                    f'{flag}/D_latent_w_dis': latent_w_dis.data[0],
-                    f'{flag}/latent_gp': latent_gp.data[0], 
-                }
-                slot_value = (step, iteration + 1, hps.iters) + \
-                        tuple([value for value in info.values()])
-                log = 'lat_D-%d:[%06d/%06d], w_dis=%.3f, gp=%.2f'
-                print(log % slot_value)
-                for tag, value in info.items():
-                    self.logger.scalar_summary(tag, value, iteration)
+            if iteration >= hps.pretrain_iters:
+                for step in range(hps.n_latent_steps):
+                    #===================== Train latent discriminator =====================#
+                    data = next(self.data_loader)
+                    (c_i, c_j), (x_i_t, x_i_tk, x_i_prime, x_j) = self.permute_data(data)
+                    # encode
+                    enc_i_t, enc_i_tk, enc_i_prime, enc_j = self.encode_step(x_i_t, x_i_tk, x_i_prime, x_j)
+                    # latent discriminate
+                    latent_w_dis, latent_gp = self.latent_discriminate_step(enc_i_t, enc_i_tk, enc_i_prime, enc_j)
+                    lat_loss = -hps.alpha_dis * latent_w_dis + hps.lambda_ * latent_gp
+                    reset_grad([self.LatentDiscriminator])
+                    lat_loss.backward()
+                    grad_clip([self.LatentDiscriminator], self.hps.max_grad_norm)
+                    self.lat_opt.step()
+                    # print info
+                    info = {
+                        f'{flag}/D_latent_w_dis': latent_w_dis.data[0],
+                        f'{flag}/latent_gp': latent_gp.data[0], 
+                    }
+                    slot_value = (step, iteration + 1, hps.iters) + \
+                            tuple([value for value in info.values()])
+                    log = 'lat_D-%d:[%06d/%06d], w_dis=%.3f, gp=%.2f'
+                    print(log % slot_value)
+                    for tag, value in info.items():
+                        self.logger.scalar_summary(tag, value, iteration)
             # two stage training
             if iteration >= hps.patch_start_iter:
                 for step in range(hps.n_patch_steps):
