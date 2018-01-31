@@ -163,8 +163,10 @@ class Solver(object):
         hps = self.hps
         for iteration in range(hps.iters):
             # calculate current alpha
-            if iteration + 1 < hps.lat_sched_iters:
-                current_alpha = hps.alpha_enc * (iteration + 1) / hps.lat_sched_iters
+            if iteration + 1 < hps.lat_sched_iters and iteration >= hps.pretrain_iters:
+                current_alpha = hps.alpha_enc * (iteration + 1) / (hps.lat_sched_iters - hps.pretrain_iters)
+            else:
+                current_alpha = 0
             if iteration >= hps.pretrain_iters:
                 for step in range(hps.n_latent_steps):
                     #===================== Train latent discriminator =====================#
