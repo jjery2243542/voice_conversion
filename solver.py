@@ -164,7 +164,7 @@ class Solver(object):
         for iteration in range(hps.iters):
             # calculate current alpha
             if iteration + 1 < hps.lat_sched_iters and iteration >= hps.enc_pretrain_iters:
-                current_alpha = hps.alpha_enc * (iteration + 1) / (hps.lat_sched_iters - hps.enc_pretrain_iters)
+                current_alpha = hps.alpha_enc * (iteration + 1 - hps.enc_pretrain_iters) / (hps.lat_sched_iters - hps.enc_pretrain_iters)
             else:
                 current_alpha = 0
             if iteration >= hps.enc_pretrain_iters:
