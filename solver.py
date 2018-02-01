@@ -26,7 +26,7 @@ class Solver(object):
         self.hps = hps
         self.data_loader = data_loader
         self.model_kept = []
-        self.max_keep = 10
+        self.max_keep = 20
         self.build_model()
         self.logger = Logger(log_dir)
 
@@ -167,8 +167,9 @@ class Solver(object):
                 current_alpha = hps.alpha_enc * (iteration + 1) / (hps.lat_sched_iters - hps.pretrain_iters)
             else:
                 current_alpha = 0
-            if iteration >= hps.pretrain_iters:
-                n_latent_steps = hps.n_latent_steps if iteration > hps.pretrain_iters else hps.pretrain_iters
+            if iteration >= hps.enc_pretrain_iters:
+                n_latent_steps = hps.n_latent_steps \
+                    if iteration > hps.enc_pretrain_iters else hps.dis_pretrain_iters
                 for step in range(n_latent_steps):
                     #===================== Train latent discriminator =====================#
                     data = next(self.data_loader)
