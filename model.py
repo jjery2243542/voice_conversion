@@ -387,24 +387,26 @@ class Encoder(nn.Module):
         self.drop5 = nn.Dropout(p=dp)
         self.drop6 = nn.Dropout(p=dp)
 
-    def conv_block(self, x, conv_layers, norm_layer, res=True):
+    def conv_block(self, x, conv_layers, norm_layers, res=True):
         out = x
         for layer in conv_layers:
             out = pad_layer(out, layer)
             out = F.leaky_relu(out, negative_slope=self.ns)
-        out = norm_layer(out)
+        for layer in norm_layers:
+            out = layer(out)
         if res:
             x_pad = F.pad(x, pad=(0, x.size(2) % 2), mode='reflect')
             x_down = F.avg_pool1d(x_pad, kernel_size=2)
             out = x_down + out 
         return out
 
-    def dense_block(self, x, layers, norm_layer, res=True):
+    def dense_block(self, x, layers, norm_layers, res=True):
         out = x
         for layer in layers:
             out = linear(out, layer)
             out = F.leaky_relu(out, negative_slope=self.ns)
-        out = norm_layer(out)
+        for layer in norm_layers:
+            out = layer(out)
         if res:
             out = out + x
         return out
@@ -416,13 +418,13 @@ class Encoder(nn.Module):
             outs.append(out)
         out = torch.cat(outs + [x], dim=1)
         out = F.leaky_relu(out, negative_slope=self.ns)
-        out = self.conv_block(out, [self.conv2], self.ins_norm1, res=False)
-        out = self.conv_block(out, [self.conv3, self.conv4], self.ins_norm2)
-        out = self.conv_block(out, [self.conv5, self.conv6], self.ins_norm3)
-        out = self.conv_block(out, [self.conv7, self.conv8], self.ins_norm4)
+        out = self.conv_block(out, [self.conv2], [self.ins_norm1, self.drop1], res=False)
+        out = self.conv_block(out, [self.conv3, self.conv4], [self.ins_norm2, self.drop2])
+        out = self.conv_block(out, [self.conv5, self.conv6], [self.ins_norm3, self.drop3])
+        out = self.conv_block(out, [self.conv7, self.conv8], [self.ins_norm4, self.drop4])
         # dense layer
-        out = self.dense_block(out, [self.dense1, self.dense2], self.ins_norm5, res=True)
-        out = self.dense_block(out, [self.dense3, self.dense4], self.ins_norm6, res=True)
+        out = self.dense_block(out, [self.dense1, self.dense2], [self.ins_norm5, self.drop5], res=True)
+        out = self.dense_block(out, [self.dense3, self.dense4], self.ins_norm6, self.drop6], res=True)
         out_rnn = RNN(out, self.RNN)
         out = torch.cat([out, out_rnn], dim=1)
         out = linear(out, self.linear)

@@ -179,7 +179,7 @@ class Solver(object):
                     loss_adv = self.latent_discriminate_step(enc_i_t, enc_i_tk, enc_i_prime, enc_j)
                     loss_adv = hps.alpha_dis * loss_adv
                     reset_grad([self.LatentDiscriminator])
-                    lat_loss.backward()
+                    loss_adv.backward()
                     grad_clip([self.LatentDiscriminator], self.hps.max_grad_norm)
                     self.lat_opt.step()
                     # print info
