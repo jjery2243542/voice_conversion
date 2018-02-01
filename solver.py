@@ -34,10 +34,10 @@ class Solver(object):
         hps = self.hps
         ns = self.hps.ns
         emb_size = self.hps.emb_size
-        self.Encoder = Encoder(ns=ns)
+        self.Encoder = Encoder(ns=ns, dp=hps.enc_dp)
         self.Decoder = Decoder(ns=ns, c_a=hps.n_speakers, emb_size=emb_size)
         self.Generator = Decoder(ns=ns, c_a=hps.n_speakers, emb_size=emb_size)
-        self.LatentDiscriminator = LatentDiscriminator(ns=ns)
+        self.LatentDiscriminator = LatentDiscriminator(ns=ns, dp=hps.dis_dp)
         self.PatchDiscriminator = PatchDiscriminator(ns=ns, n_class=hps.n_speakers)
         if torch.cuda.is_available():
             self.Encoder.cuda()
@@ -128,17 +128,16 @@ class Solver(object):
         x_tilde = self.Decoder(enc, c)
         return x_tilde
 
-    def latent_discriminate_step(self, enc_i_t, enc_i_tk, enc_i_prime, enc_j, cal_gp=True):
+    def latent_discriminate_step(self, enc_i_t, enc_i_tk, enc_i_prime, enc_j, is_dis=True):
         same_pair = torch.cat([enc_i_t, enc_i_tk], dim=1)
         diff_pair = torch.cat([enc_i_prime, enc_j], dim=1)
         same_val = self.LatentDiscriminator(same_pair)
         diff_val = self.LatentDiscriminator(diff_pair)
-        w_dis = torch.mean(same_val - diff_val)
-        if cal_gp:
-            gp = calculate_gradients_penalty(self.LatentDiscriminator, same_pair, diff_pair)
-            return w_dis, gp
+        if is_dis:
+            loss = torch.mean((same_val-1.0)**2 + diff_val**2)
         else:
-            return (w_dis,)
+            loss = torch.mean((same_val-0.5)**2 + (diff_val-0.5)**2)
+        return loss
 
     def patch_discriminate_step(self, x, x_tilde, cal_gp=True):
         # w-distance
@@ -177,20 +176,19 @@ class Solver(object):
                     # encode
                     enc_i_t, enc_i_tk, enc_i_prime, enc_j = self.encode_step(x_i_t, x_i_tk, x_i_prime, x_j)
                     # latent discriminate
-                    latent_w_dis, latent_gp = self.latent_discriminate_step(enc_i_t, enc_i_tk, enc_i_prime, enc_j)
-                    lat_loss = -hps.alpha_dis * latent_w_dis + hps.lambda_ * latent_gp
+                    loss_adv = self.latent_discriminate_step(enc_i_t, enc_i_tk, enc_i_prime, enc_j)
+                    loss_adv = hps.alpha_dis * loss_adv
                     reset_grad([self.LatentDiscriminator])
                     lat_loss.backward()
                     grad_clip([self.LatentDiscriminator], self.hps.max_grad_norm)
                     self.lat_opt.step()
                     # print info
                     info = {
-                        f'{flag}/D_latent_w_dis': latent_w_dis.data[0],
-                        f'{flag}/latent_gp': latent_gp.data[0], 
+                        f'{flag}/D_loss_adv': loss_adv.data[0],
                     }
                     slot_value = (step, iteration + 1, hps.iters) + \
                             tuple([value for value in info.values()])
-                    log = 'lat_D-%d:[%06d/%06d], w_dis=%.3f, gp=%.2f'
+                    log = 'lat_D-%d:[%06d/%06d], loss_adv=%.3f'
                     print(log % slot_value)
                     for tag, value in info.items():
                         self.logger.scalar_summary(tag, value, iteration)
@@ -235,9 +233,9 @@ class Solver(object):
             x_tilde = self.decode_step(enc_i_t, c_i)
             loss_rec = torch.mean(torch.abs(x_tilde - x_i_t))
             # latent discriminate
-            latent_w_dis, = self.latent_discriminate_step(
-                    enc_i_t, enc_i_tk, enc_i_prime, enc_j, cal_gp=False)
-            ae_loss = loss_rec + current_alpha * latent_w_dis
+            loss_adv = self.latent_discriminate_step(
+                    enc_i_t, enc_i_tk, enc_i_prime, enc_j, is_dis=False)
+            ae_loss = loss_rec + current_alpha * loss_adv
             reset_grad([self.Encoder, self.Decoder])
             retain_graph = True if hps.n_patch_steps > 0 else False
             ae_loss.backward(retain_graph=retain_graph)
@@ -245,11 +243,11 @@ class Solver(object):
             self.ae_opt.step()
             info = {
                 f'{flag}/loss_rec': loss_rec.data[0],
-                f'{flag}/G_latent_w_dis': latent_w_dis.data[0],
+                f'{flag}/G_loss_adv': loss_adv.data[0],
                 f'{flag}/alpha': current_alpha,
             }
             slot_value = (iteration+1, hps.iters) + tuple([value for value in info.values()])
-            log = 'G:[%06d/%06d], loss_rec=%.2f, latent_w_dis=%.2f, alpha=%.2e'
+            log = 'G:[%06d/%06d], loss_rec=%.2f, loss_adv=%.2f, alpha=%.2e'
             print(log % slot_value)
             for tag, value in info.items():
                 self.logger.scalar_summary(tag, value, iteration + 1)

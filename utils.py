@@ -65,7 +65,8 @@ class Hps(object):
             'beta_clf',
             'lambda_',
             'ns', 
-            'dp', 
+            'enc_dp', 
+            'dis_dp', 
             'max_grad_norm',
             'max_step',
             'seg_len',
@@ -82,7 +83,7 @@ class Hps(object):
             ]
         )
         default = \
-            [1e-4, 1e-4, 1e-4, 1e-4, 1e-4, 1e-4, 10, 0.01, 0.0, 5, 5, 128, 128, 8, 5, 5, 32, 50000, 5000, 1000, 50000, 60000]
+            [1e-4, 1, 1e-4, 0, 0, 0, 10, 0.01, 0.5, 0.1, 5, 5, 128, 128, 8, 5, 0, 32, 50000, 5000, 5000, 80000, 60000]
         self._hps = self.hps._make(default)
 
     def get_tuple(self):

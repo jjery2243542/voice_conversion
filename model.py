@@ -353,7 +353,7 @@ class Decoder(nn.Module):
         return out
 
 class Encoder(nn.Module):
-    def __init__(self, c_in=513, c_h1=128, c_h2=512, c_h3=128, ns=0.2):
+    def __init__(self, c_in=513, c_h1=128, c_h2=512, c_h3=128, ns=0.2, dp=0.5):
         super(Encoder, self).__init__()
         self.ns = ns
         self.conv1s = nn.ModuleList(
@@ -379,6 +379,13 @@ class Encoder(nn.Module):
         self.ins_norm4 = nn.InstanceNorm1d(c_h2)
         self.ins_norm5 = nn.InstanceNorm1d(c_h2)
         self.ins_norm6 = nn.InstanceNorm1d(c_h2)
+        # dropout layer
+        self.drop1 = nn.Dropout(p=dp)
+        self.drop2 = nn.Dropout(p=dp)
+        self.drop3 = nn.Dropout(p=dp)
+        self.drop4 = nn.Dropout(p=dp)
+        self.drop5 = nn.Dropout(p=dp)
+        self.drop6 = nn.Dropout(p=dp)
 
     def conv_block(self, x, conv_layers, norm_layer, res=True):
         out = x
