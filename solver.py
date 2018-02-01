@@ -168,7 +168,8 @@ class Solver(object):
             else:
                 current_alpha = 0
             if iteration >= hps.pretrain_iters:
-                for step in range(hps.n_latent_steps):
+                n_latent_steps = hps.n_latent_steps if iteration > hps.pretrain_iters else hps.pretrain_iters
+                for step in range(n_latent_steps):
                     #===================== Train latent discriminator =====================#
                     data = next(self.data_loader)
                     (c_i, c_j), (x_i_t, x_i_tk, x_i_prime, x_j) = self.permute_data(data)
