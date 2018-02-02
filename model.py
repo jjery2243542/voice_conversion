@@ -424,7 +424,7 @@ class Encoder(nn.Module):
         out = self.conv_block(out, [self.conv7, self.conv8], [self.ins_norm4, self.drop4])
         # dense layer
         out = self.dense_block(out, [self.dense1, self.dense2], [self.ins_norm5, self.drop5], res=True)
-        out = self.dense_block(out, [self.dense3, self.dense4], self.ins_norm6, self.drop6], res=True)
+        out = self.dense_block(out, [self.dense3, self.dense4], [self.ins_norm6, self.drop6], res=True)
         out_rnn = RNN(out, self.RNN)
         out = torch.cat([out, out_rnn], dim=1)
         out = linear(out, self.linear)
