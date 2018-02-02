@@ -162,10 +162,12 @@ class Solver(object):
         hps = self.hps
         for iteration in range(hps.iters):
             # calculate current alpha
-            if iteration + 1 < hps.lat_sched_iters and iteration >= hps.enc_pretrain_iters:
-                current_alpha = hps.alpha_enc * (iteration + 1 - hps.enc_pretrain_iters) / (hps.lat_sched_iters - hps.enc_pretrain_iters)
-            else:
+            if iteration < hps.enc_pretrain_iters:
                 current_alpha = 0
+            elif iteration < hps.enc_pretrain_iters + hps.lat_sched_iters:
+                current_alpha = hps.alpha_enc * (iteration - hps.enc_pretrain_iters) / hps.lat_sched_iters
+            else:
+                current_alpha = hps.alpha_enc
             if iteration >= hps.enc_pretrain_iters:
                 n_latent_steps = hps.n_latent_steps \
                     if iteration > hps.enc_pretrain_iters else hps.dis_pretrain_iters
