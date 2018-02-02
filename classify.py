@@ -32,8 +32,8 @@ class Classifier(object):
 
     def build_model(self):
         hps = self.hps
-        self.SpeakerClassifier = SpeakerClassifier(ns=hps.ns, dp=hps.dp, n_class=hps.n_speakers)
-        self.Encoder = Encoder(ns=hps.ns)
+        self.SpeakerClassifier = SpeakerClassifier(ns=hps.ns, dp=hps.dis_dp, n_class=hps.n_speakers)
+        self.Encoder = Encoder(ns=hps.ns, dp=hps.enc_dp)
         if torch.cuda.is_available():
             self.SpeakerClassifier.cuda()
             self.Encoder.cuda()
@@ -152,7 +152,7 @@ if __name__ == '__main__':
     parser.add_argument('-hps_path', default='./hps/clf.json')
     parser.add_argument('-load_model_path', default='/storage/model/voice_conversion/'
             'pretrain_model.pkl-19999')
-    parser.add_argument('-encoder_model_path', default='/storage/model/voice_conversion/ae/model.pkl-59999')
+    parser.add_argument('-encoder_model_path', default='/storage/model/voice_conversion/v20/1000_model.pkl')
     parser.add_argument('-dataset_path', default='/storage/feature/voice_conversion/vctk/log_vctk.h5')
     parser.add_argument('-train_index_path', \
             default='/storage/feature/voice_conversion/vctk/128_513_2000k.json')

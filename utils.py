@@ -54,6 +54,18 @@ def cal_acc(logits, y_true):
     acc = torch.sum((ind == y_true).type(torch.FloatTensor)) / y_true.size(0)
     return acc
 
+class GradReverse(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, x):
+        return x.view_as(x)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        return grad_output.neg()
+
+def grad_reverse(x):
+    return GradReverse.apply(x)
+
 class Hps(object):
     def __init__(self):
         self.hps = namedtuple('hps', [
