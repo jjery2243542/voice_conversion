@@ -159,7 +159,7 @@ class Solver(object):
             }
             slot_value = (iteration+1, hps.iters) + tuple([value for value in info.values()])
             log = 'G:[%06d/%06d], loss_rec=%.2f, loss_clf=%.2f, alpha=%.2e, acc=%.2f'
-            print(log % slot_value)
+            print(log % slot_value, end='\r')
             for tag, value in info.items():
                 self.logger.scalar_summary(tag, value, iteration + 1)
             if iteration % 1000 == 0 or iteration + 1 == hps.iters:
