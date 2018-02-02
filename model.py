@@ -4,6 +4,16 @@ import torch.nn.functional as F
 import torch
 from torch.autograd import Variable
 
+class GradReverse(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, x, _lambda=0.0001):
+        ctx._lambda = _lambda
+        return x.view_as(x)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        return grad_output * (-ctx._lambda)
+
 def pad_layer(inp, layer, is_2d=False):
     if type(layer.kernel_size) == tuple:
         kernel_size = layer.kernel_size[0]
@@ -183,7 +193,9 @@ class SpeakerClassifier(nn.Module):
             out = out + x
         return out
 
-    def forward(self, x):
+    def forward(self, x, _lambda=0.0001, gr=False):
+        if gr:
+            x = GradReverse(_lambda=_lambda).apply(x)
         out = self.conv_block(x, [self.conv1, self.conv2], [self.ins_norm1, self.drop1], res=False)
         out = self.conv_block(out, [self.conv3, self.conv4], [self.ins_norm2, self.drop2], res=True)
         out = self.conv_block(out, [self.conv5, self.conv6], [self.ins_norm3, self.drop3], res=True)
@@ -436,12 +448,12 @@ if __name__ == '__main__':
     D = Decoder().cuda()
     C = LatentDiscriminator().cuda()
     P = PatchDiscriminator().cuda()
-    #S = SpeakerClassifier().cuda()
+    S = SpeakerClassifier().cuda()
     #cbhg = CBHG().cuda()
     inp = Variable(torch.randn(16, 513, 128)).cuda()
     e1 = E1(inp)
     print(e1.size())
-    #s1 = S(e1)
+    s1 = S(e1, gr=True)
     c = Variable(torch.from_numpy(np.random.randint(8, size=(16)))).cuda()
     d = D(e1, c)
     print(d.size())
