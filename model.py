@@ -6,13 +6,14 @@ from torch.autograd import Variable
 
 class GradReverse(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, x, _lambda=0.0001):
-        ctx._lambda = _lambda
+    #def forward(ctx, x, _lambda=0.0001):
+    def forward(ctx, x):
+        #ctx._lambda = _lambda
         return x.view_as(x)
 
     @staticmethod
     def backward(ctx, grad_output):
-        return grad_output * (-ctx._lambda)
+        return grad_output.neg()
 
 def pad_layer(inp, layer, is_2d=False):
     if type(layer.kernel_size) == tuple:
@@ -163,10 +164,9 @@ class WeakSpeakerClassifier(nn.Module):
     def __init__(self, c_in=512, c_h=512, n_class=8, dp=0.1, ns=0.01):
         super(WeakSpeakerClassifier, self).__init__()
         self.dp, self.ns = dp, ns
-        self.conv1 = nn.Conv1d(c_in, c_h, kernel_size=5)
-        self.conv2 = nn.Conv1d(c_h, c_h, kernel_size=16)
-        self.conv3 = nn.Conv1d(c_h, n_class, kernel_size=1)
-
+        self.conv1 = nn.Conv1d(c_in, c_h, kernel_size=5, stride=2)
+        self.conv2 = nn.Conv1d(c_h, c_h, kernel_size=5, stride=2)
+        self.conv3 = nn.Conv1d(c_h, n_class, kernel_size=4)
         self.drop1 = nn.Dropout(p=dp)
         self.drop2 = nn.Dropout(p=dp)
         self.ins_norm1 = nn.InstanceNorm1d(c_h)

@@ -20,6 +20,11 @@ def cal_mean_grad(net):
         grad += torch.mean(p.grad)
     return grad.data[0] / (i + 1)
 
+def multiply_grad(nets, c):
+    for net in nets:
+        for p in net.parameters():
+            p.grad *= c
+
 def to_var(x, requires_grad=True):
     x = Variable(x, requires_grad=requires_grad)
     return x.cuda() if torch.cuda.is_available() else x

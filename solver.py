@@ -19,6 +19,7 @@ from utils import Logger
 from utils import DataLoader
 from utils import to_var
 from utils import reset_grad
+from utils import multiply_grad
 from utils import grad_clip
 from utils import cal_acc
 #from utils import calculate_gradients_penalty
@@ -41,15 +42,16 @@ class Solver(object):
         self.Decoder = Decoder(ns=ns, c_a=hps.n_speakers, emb_size=emb_size)
         #self.Generator = Decoder(ns=ns, c_a=hps.n_speakers, emb_size=emb_size)
         #self.LatentDiscriminator = LatentDiscriminator(ns=ns, dp=hps.dis_dp)
-        self.SpeakerClassifier = WeakSpeakerClassifier(ns=ns, n_class=hps.n_speakers, dp=hps.dis_dp) 
+        self.SpeakerClassifier = SpeakerClassifier(ns=ns, n_class=hps.n_speakers, dp=hps.dis_dp) 
         #self.PatchDiscriminator = PatchDiscriminator(ns=ns, n_class=hps.n_speakers)
         if torch.cuda.is_available():
             self.Encoder.cuda()
             self.Decoder.cuda()
             self.SpeakerClassifier.cuda()
         betas = (0.5, 0.9)
-        params = list(self.Encoder.parameters()) + list(self.Decoder.parameters()) + list(self.SpeakerClassifier.parameters())
-        self.opt = optim.Adam(params, lr=self.hps.lr, betas=betas)
+        params = list(self.Encoder.parameters()) + list(self.Decoder.parameters())
+        self.ae_opt = optim.Adam(params, lr=self.hps.lr, betas=betas)
+        self.clf_opt = optim.Adam(self.SpeakerClassifier.parameters(), lr=self.hps.lr, betas=betas)
 
     def save_model(self, model_path, iteration, enc_only=True):
         if not enc_only:
@@ -128,10 +130,10 @@ class Solver(object):
         hps = self.hps
         for iteration in range(hps.iters):
             # calculate current alpha
-            if iteration < hps.enc_pretrain_iters:
+            if iteration < hps.enc_pretrain_iters + hps.dis_pretrain_iters:
                 current_alpha = 0
-            elif iteration < hps.enc_pretrain_iters + hps.lat_sched_iters:
-                current_alpha = hps.alpha_enc * (iteration - hps.enc_pretrain_iters) / hps.lat_sched_iters
+            elif iteration < hps.enc_pretrain_iters + hps.dis_pretrain_iters + hps.lat_sched_iters:
+                current_alpha = hps.alpha_enc * (iteration - hps.enc_pretrain_iters - hps.dis_pretrain_iters) / hps.lat_sched_iters
             else:
                 current_alpha = hps.alpha_enc
             data = next(self.data_loader)
@@ -142,16 +144,21 @@ class Solver(object):
             if iteration >= hps.enc_pretrain_iters:
                 # classify speaker
                 logits = self.clf_step(enc, current_alpha, gr=True)
-                loss_clf = self.cal_loss(logits, c)
+                loss_clf = self.cal_loss(logits, c) 
                 # update 
                 loss_clf.backward(retain_graph=True)
+                # multiply gradient by alpha
+                multiply_grad(nets=[self.SpeakerClassifier], c=hps.alpha_dis)
+                multiply_grad(nets=[self.Encoder], c=current_alpha)
                 acc = cal_acc(logits, c)
+                self.clf_opt.step()
             # decode
-            x_tilde = self.decode_step(enc, c)
-            loss_rec = torch.mean((x_tilde - x)**2)
-            loss_rec.backward()
-            grad_clip([self.Encoder, self.Decoder, self.SpeakerClassifier], self.hps.max_grad_norm)
-            self.opt.step()
+            if iteration < hps.enc_pretrain_iters or iteration > hps.enc_pretrain_iters + hps.dis_pretrain_iters:
+                x_tilde = self.decode_step(enc, c)
+                loss_rec = torch.mean(torch.abs(x_tilde - x))
+                loss_rec.backward()
+                grad_clip([self.Encoder, self.Decoder, self.SpeakerClassifier], self.hps.max_grad_norm)
+                self.ae_opt.step()
             info = {
                 f'{flag}/loss_rec': loss_rec.data[0],
                 f'{flag}/loss_clf': loss_clf.data[0] if iteration >= hps.enc_pretrain_iters else 0,
