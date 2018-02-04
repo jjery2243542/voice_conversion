@@ -9,6 +9,7 @@ from utils import myDataset
 from model import Encoder
 from model import Decoder
 from model import SpeakerClassifier
+from model import WeakSpeakerClassifier
 #from model import LatentDiscriminator
 #from model import PatchDiscriminator
 from model import CBHG
@@ -40,7 +41,7 @@ class Solver(object):
         self.Decoder = Decoder(ns=ns, c_a=hps.n_speakers, emb_size=emb_size)
         #self.Generator = Decoder(ns=ns, c_a=hps.n_speakers, emb_size=emb_size)
         #self.LatentDiscriminator = LatentDiscriminator(ns=ns, dp=hps.dis_dp)
-        self.SpeakerClassifier = SpeakerClassifier(ns=ns, n_class=hps.n_speakers, dp=hps.dis_dp) 
+        self.SpeakerClassifier = WeakSpeakerClassifier(ns=ns, n_class=hps.n_speakers, dp=hps.dis_dp) 
         #self.PatchDiscriminator = PatchDiscriminator(ns=ns, n_class=hps.n_speakers)
         if torch.cuda.is_available():
             self.Encoder.cuda()
@@ -147,7 +148,7 @@ class Solver(object):
                 acc = cal_acc(logits, c)
             # decode
             x_tilde = self.decode_step(enc, c)
-            loss_rec = torch.mean(torch.abs(x_tilde - x))
+            loss_rec = torch.mean((x_tilde - x)**2)
             loss_rec.backward()
             grad_clip([self.Encoder, self.Decoder, self.SpeakerClassifier], self.hps.max_grad_norm)
             self.opt.step()

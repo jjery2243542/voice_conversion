@@ -1,7 +1,7 @@
 {
     "lr": 0.0001,
     "alpha_dis": 1,
-    "alpha_enc": 1,
+    "alpha_enc": 10,
     "beta_dis": 0,
     "beta_gen": 0,
     "beta_clf": 0,
@@ -17,8 +17,8 @@
     "n_latent_steps": 0,
     "n_patch_steps": 0,
     "batch_size": 32,
-    "lat_sched_iters": 30000,
-    "enc_pretrain_iters": 5000,
+    "lat_sched_iters": 0,
+    "enc_pretrain_iters": 3000,
     "dis_pretrain_iters": 0,
     "patch_start_iter": 100000,
     "iters": 60000

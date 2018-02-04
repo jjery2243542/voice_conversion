@@ -159,6 +159,39 @@ class PatchDiscriminator(nn.Module):
         else:
             return mean_val
 
+class WeakSpeakerClassifier(nn.Module):
+    def __init__(self, c_in=512, c_h=512, n_class=8, dp=0.1, ns=0.01):
+        super(WeakSpeakerClassifier, self).__init__()
+        self.dp, self.ns = dp, ns
+        self.conv1 = nn.Conv1d(c_in, c_h, kernel_size=5)
+        self.conv2 = nn.Conv1d(c_h, c_h, kernel_size=16)
+        self.conv3 = nn.Conv1d(c_h, n_class, kernel_size=1)
+
+        self.drop1 = nn.Dropout(p=dp)
+        self.drop2 = nn.Dropout(p=dp)
+        self.ins_norm1 = nn.InstanceNorm1d(c_h)
+        self.ins_norm2 = nn.InstanceNorm1d(c_h)
+
+    def conv_block(self, x, conv_layers, after_layers, res=True):
+        out = x
+        for layer in conv_layers:
+            out = pad_layer(out, layer)
+            out = F.leaky_relu(out, negative_slope=self.ns)
+        for layer in after_layers:
+            out = layer(out)
+        if res:
+            out = out + x
+        return out
+
+    def forward(self, x, _lambda=0.0001, gr=False):
+        if gr:
+            x = GradReverse(_lambda=_lambda).apply(x)
+        out = self.conv_block(x, [self.conv1], [self.ins_norm1, self.drop1], res=False)
+        out = self.conv_block(out, [self.conv2], [self.ins_norm2, self.drop2], res=False)
+        out = self.conv3(out)
+        out = out.view(out.size()[0], -1)
+        return out
+
 class SpeakerClassifier(nn.Module):
     def __init__(self, c_in=512, c_h=512, n_class=8, dp=0.1, ns=0.01):
         super(SpeakerClassifier, self).__init__()
