@@ -1,7 +1,7 @@
 {
     "lr": 0.0001,
     "alpha_dis": 1,
-    "alpha_enc": 0.1,
+    "alpha_enc": 0.01,
     "beta_dis": 0,
     "beta_gen": 0,
     "beta_clf": 0,
@@ -14,12 +14,12 @@
     "seg_len": 128,
     "emb_size": 128,
     "n_speakers": 8,
-    "n_latent_steps": 0,
+    "n_latent_steps": 5,
     "n_patch_steps": 0,
     "batch_size": 32,
-    "lat_sched_iters": 30,
-    "enc_pretrain_iters": 15,
-    "dis_pretrain_iters": 10,
+    "lat_sched_iters": 100,
+    "enc_pretrain_iters": 50,
+    "dis_pretrain_iters": 30,
     "patch_start_iter": 100000,
     "iters": 60000
 }

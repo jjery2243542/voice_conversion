@@ -115,8 +115,8 @@ class Solver(object):
         x_tilde = self.Decoder(enc, c)
         return x_tilde
 
-    def clf_step(self, enc, _lambda=0.0001, gr=True):
-        logits = self.SpeakerClassifier(enc, _lambda=_lambda, gr=gr)
+    def clf_step(self, enc, gamma=0.2):
+        logits = self.SpeakerClassifier(enc) * gamma
         return logits
 
     def cal_loss(self, logits, y_true):
@@ -125,53 +125,118 @@ class Solver(object):
         loss = criterion(logits, y_true)
         return loss
 
-    def train(self, model_path, flag='train'):
+    def train(self, model_path, flag='train', mode='train'):
         # load hyperparams
         hps = self.hps
-        for iteration in range(hps.iters):
-            # calculate current alpha
-            if iteration < hps.enc_pretrain_iters + hps.dis_pretrain_iters:
-                current_alpha = 0
-            elif iteration < hps.enc_pretrain_iters + hps.dis_pretrain_iters + hps.lat_sched_iters:
-                current_alpha = hps.alpha_enc * (iteration - hps.enc_pretrain_iters - hps.dis_pretrain_iters) / hps.lat_sched_iters
-            else:
-                current_alpha = hps.alpha_enc
-            data = next(self.data_loader)
-            c, x = self.permute_data(data)
-            # encode
-            enc = self.encode_step(x)
-            reset_grad([self.Encoder, self.Decoder, self.SpeakerClassifier])
-            if iteration >= hps.enc_pretrain_iters:
-                # classify speaker
-                logits = self.clf_step(enc, current_alpha, gr=True)
-                loss_clf = self.cal_loss(logits, c) 
-                # update 
-                loss_clf.backward(retain_graph=True)
-                # multiply gradient by alpha
-                multiply_grad(nets=[self.SpeakerClassifier], c=hps.alpha_dis)
-                multiply_grad(nets=[self.Encoder], c=current_alpha)
-                acc = cal_acc(logits, c)
-                self.clf_opt.step()
-            # decode
-            if iteration < hps.enc_pretrain_iters or iteration > hps.enc_pretrain_iters + hps.dis_pretrain_iters:
+        if mode == 'pretrain_G':
+            for iteration in range(hps.enc_pretrain_iters):
+                data = next(self.data_loader)
+                c, x = self.permute_data(data)
+                # encode
+                enc = self.encode_step(x)
                 x_tilde = self.decode_step(enc, c)
                 loss_rec = torch.mean(torch.abs(x_tilde - x))
+                reset_grad([self.Encoder, self.Decoder])
                 loss_rec.backward()
-                grad_clip([self.Encoder, self.Decoder, self.SpeakerClassifier], self.hps.max_grad_norm)
+                grad_clip([self.Encoder, self.Decoder], self.hps.max_grad_norm)
                 self.ae_opt.step()
-            info = {
-                f'{flag}/loss_rec': loss_rec.data[0],
-                f'{flag}/loss_clf': loss_clf.data[0] if iteration >= hps.enc_pretrain_iters else 0,
-                f'{flag}/alpha': current_alpha,
-                f'{flag}/acc': acc if iteration >= hps.enc_pretrain_iters else 0,
-            }
-            slot_value = (iteration+1, hps.iters) + tuple([value for value in info.values()])
-            log = 'G:[%06d/%06d], loss_rec=%.2f, loss_clf=%.2f, alpha=%.2e, acc=%.2f'
-            print(log % slot_value, end='\r')
-            for tag, value in info.items():
-                self.logger.scalar_summary(tag, value, iteration + 1)
-            if iteration % 1000 == 0 or iteration + 1 == hps.iters:
-                self.save_model(model_path, iteration)
+                # tb info
+                info = {
+                    f'{flag}/pre_loss_rec': loss_rec.data[0],
+                }
+                slot_value = (iteration + 1, hps.enc_pretrain_iters) + tuple([value for value in info.values()])
+                log = 'pre_G:[%06d/%06d], loss_rec=%.2f'
+                print(log % slot_value)
+                for tag, value in info.items():
+                    self.logger.scalar_summary(tag, value, iteration + 1)
+        elif mode == 'pretrain_D':
+            for iteration in range(hps.dis_pretrain_iters):
+                data = next(self.data_loader)
+                c, x = self.permute_data(data)
+                # encode
+                enc = self.encode_step(x)
+                # classify speaker
+                logits = self.clf_step(enc)
+                loss_clf = self.cal_loss(logits, c)
+                # update 
+                reset_grad([self.SpeakerClassifier])
+                loss_clf.backward()
+                grad_clip([self.SpeakerClassifier], self.hps.max_grad_norm)
+                self.clf_opt.step()
+                # calculate acc
+                acc = cal_acc(logits, c)
+                info = {
+                    f'{flag}/pre_loss_clf': loss_clf.data[0],
+                    f'{flag}/pre_acc': acc,
+                }
+                slot_value = (iteration + 1, hps.dis_pretrain_iters) + tuple([value for value in info.values()])
+                log = 'pre_D:[%06d/%06d], loss_clf=%.2f, acc=%.2f'
+                print(log % slot_value)
+                for tag, value in info.items():
+                    self.logger.scalar_summary(tag, value, iteration + 1)
+        elif mode == 'train':
+            for iteration in range(hps.iters):
+                # calculate current alpha
+                if iteration < hps.lat_sched_iters:
+                    current_alpha = hps.alpha_enc * (iteration / hps.lat_sched_iters)
+                else:
+                    current_alpha = hps.alpha_enc
+                #==================train D==================#
+                for step in range(hps.n_latent_steps):
+                    data = next(self.data_loader)
+                    c, x = self.permute_data(data)
+                    # encode
+                    enc = self.encode_step(x)
+                    # classify speaker
+                    logits = self.clf_step(enc)
+                    loss_clf = self.cal_loss(logits, c)
+                    loss = hps.alpha_dis * loss_clf
+                    # update 
+                    reset_grad([self.SpeakerClassifier])
+                    loss.backward()
+                    grad_clip([self.SpeakerClassifier], self.hps.max_grad_norm)
+                    self.clf_opt.step()
+                    # calculate acc
+                    acc = cal_acc(logits, c)
+                    info = {
+                        f'{flag}/D_loss_clf': loss_clf.data[0],
+                        f'{flag}/D_acc': acc,
+                    }
+                    slot_value = (step, iteration + 1, hps.iters) + tuple([value for value in info.values()])
+                    log = 'D-%d:[%06d/%06d], loss_clf=%.2f, acc=%.2f'
+                    print(log % slot_value)
+                    for tag, value in info.items():
+                        self.logger.scalar_summary(tag, value, iteration + 1)
+                #==================train G==================#
+                data = next(self.data_loader)
+                c, x = self.permute_data(data)
+                # encode
+                enc = self.encode_step(x)
+                # decode
+                x_tilde = self.decode_step(enc, c)
+                loss_rec = torch.mean(torch.abs(x_tilde - x))
+                # classify speaker
+                logits = self.clf_step(enc)
+                loss_clf = self.cal_loss(logits, c)
+                # maximize classification loss
+                loss = loss_rec - current_alpha * loss_clf
+                reset_grad([self.Encoder, self.Decoder])
+                loss.backward()
+                grad_clip([self.Encoder, self.Decoder], self.hps.max_grad_norm)
+                self.ae_opt.step()
+                info = {
+                    f'{flag}/loss_rec': loss_rec.data[0],
+                    f'{flag}/G_loss_clf': loss_clf.data[0],
+                    f'{flag}/alpha': current_alpha,
+                    f'{flag}/G_acc': acc,
+                }
+                slot_value = (iteration + 1, hps.iters) + tuple([value for value in info.values()])
+                log = 'G:[%06d/%06d], loss_rec=%.2f, loss_clf=%.2f, alpha=%.2e, acc=%.2f'
+                print(log % slot_value)
+                for tag, value in info.items():
+                    self.logger.scalar_summary(tag, value, iteration + 1)
+                if iteration % 1000 == 0 or iteration + 1 == hps.iters:
+                    self.save_model(model_path, iteration)
 
 if __name__ == '__main__':
     hps = Hps()

@@ -143,7 +143,8 @@ class Sampler(object):
         self.speaker2utts = {speaker:list(self.f_h5[f'{dset}/{speaker}'].keys()) \
                 for speaker in self.speakers}
         # remove too short utterence
-        self.rm_too_short_utt()
+        self.rm_too_short_utt(limit=self.seg_len)
+        self.single_indexer = namedtuple('single_index', ['speaker', 'i', 't'])
         self.indexer = namedtuple('index', ['speaker_i', 'speaker_j', \
                 'i0', 'i1', 'j', 't', 't_k', 't_prime', 't_j'])
 
@@ -194,7 +195,17 @@ class Sampler(object):
 
     def rand(self, l):
         rand_idx = random.randint(0, len(l) - 1)
-        return l[rand_idx] 
+        return l[rand_idx]
+
+    def sample_single(self):
+        seg_len = self.seg_len
+        max_step = self.max_step
+        speaker_idx, = random.sample(range(len(self.speaker_used)), 1)
+        speaker = self.speaker_used[speaker_idx]
+        (utt_id, utt_len), = self.sample_utt(speaker, 1)
+        t = random.randint(0, utt_len - seg_len)  
+        index_tuple = self.single_indexer(speaker=speaker_idx, i=f'{speaker}/{utt_id}', t=t)
+        return index_tuple
 
     def sample(self):
         seg_len = self.seg_len
@@ -267,6 +278,27 @@ class DataLoader(object):
         else:
             self.index += self.batch_size
         return tuple(batch_tensor)
+
+class SingleDataset(data.Dataset):
+    def __init__(self, h5_path, index_path, dset='train', seg_len=128):
+        self.h5 = h5py.File(h5_path, 'r')
+        with open(index_path) as f_index:
+            self.indexes = json.load(f_index)
+        self.indexer = namedtuple('index', ['speaker', 'i', 't'])
+        self.seg_len = seg_len
+        self.dset = dset
+
+    def __getitem__(self, i):
+        index = self.indexes[i]
+        index = self.indexer(**index)
+        speaker = index.speaker
+        i, t = index.i, index.t
+        seg_len = self.seg_len
+        data = [speaker, self.h5[f'{self.dset}/{i}/lin'][t:t+seg_len]]
+        return tuple(data)
+
+    def __len__(self):
+        return len(self.indexes)
 
 class myDataset(data.Dataset):
     def __init__(self, h5_path, index_path, dset='train', seg_len=128):

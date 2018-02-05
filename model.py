@@ -226,9 +226,7 @@ class SpeakerClassifier(nn.Module):
             out = out + x
         return out
 
-    def forward(self, x, _lambda=0.0001, gr=False):
-        if gr:
-            x = GradReverse(_lambda=_lambda).apply(x)
+    def forward(self, x):
         out = self.conv_block(x, [self.conv1, self.conv2], [self.ins_norm1, self.drop1], res=False)
         out = self.conv_block(out, [self.conv3, self.conv4], [self.ins_norm2, self.drop2], res=True)
         out = self.conv_block(out, [self.conv5, self.conv6], [self.ins_norm3, self.drop3], res=True)
