@@ -115,8 +115,8 @@ class Solver(object):
         x_tilde = self.Decoder(enc, c)
         return x_tilde
 
-    def clf_step(self, enc, gamma=0.2):
-        logits = self.SpeakerClassifier(enc) * gamma
+    def clf_step(self, enc):
+        logits = self.SpeakerClassifier(enc)
         return logits
 
     def cal_loss(self, logits, y_true):
