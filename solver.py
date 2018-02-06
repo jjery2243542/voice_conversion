@@ -11,7 +11,7 @@ from model import Decoder
 from model import SpeakerClassifier
 from model import WeakSpeakerClassifier
 #from model import LatentDiscriminator
-#from model import PatchDiscriminator
+from model import PatchDiscriminator
 from model import CBHG
 import os
 from utils import Hps
@@ -108,7 +108,7 @@ class Solver(object):
         return C, X
 
     def sample_c(self, size):
-        n_speakers = hps.n_speakers
+        n_speakers = self.hps.n_speakers
         c_sample = Variable(
                 torch.multinomial(torch.ones(n_speakers), num_samples=size, replacement=True),  
                 requires_grad=False)

@@ -17,7 +17,7 @@ from preprocess.tacotron.mcep import mc2wav
 if __name__ == '__main__':
     feature = 'sp'
     hps = Hps()
-    hps.load('./hps/v22.json')
+    hps.load('./hps/ori_v22.json')
     hps_tuple = hps.get_tuple()
     solver = Solver(hps_tuple, None)
     solver.load_model('/storage/model/voice_conversion/v22/model.pkl-59999')
