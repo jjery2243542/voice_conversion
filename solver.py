@@ -41,15 +41,15 @@ class Solver(object):
         emb_size = self.hps.emb_size
         self.Encoder = cc(Encoder(ns=ns, dp=hps.enc_dp))
         self.Decoder = cc(Decoder(ns=ns, c_a=hps.n_speakers, emb_size=emb_size))
-        self.Generator = cc(Decoder(ns=ns, c_a=hps.n_speakers, emb_size=emb_size))
+        #self.Generator = cc(Decoder(ns=ns, c_a=hps.n_speakers, emb_size=emb_size))
         self.SpeakerClassifier = cc(SpeakerClassifier(ns=ns, n_class=hps.n_speakers, dp=hps.dis_dp))
-        self.PatchDiscriminator = cc(PatchDiscriminator(ns=ns, n_class=hps.n_speakers))
+        #self.PatchDiscriminator = cc(PatchDiscriminator(ns=ns, n_class=hps.n_speakers))
         betas = (0.5, 0.9)
         params = list(self.Encoder.parameters()) + list(self.Decoder.parameters())
         self.ae_opt = optim.Adam(params, lr=self.hps.lr, betas=betas)
         self.clf_opt = optim.Adam(self.SpeakerClassifier.parameters(), lr=self.hps.lr, betas=betas)
-        self.gen_opt = optim.Adam(self.Generator.parameters(), lr=self.hps.lr, betas=betas)
-        self.patch_opt = optim.Adam(self.PatchDiscriminator.parameters(), lr=self.hps.lr, betas=betas)
+        #self.gen_opt = optim.Adam(self.Generator.parameters(), lr=self.hps.lr, betas=betas)
+        #self.patch_opt = optim.Adam(self.PatchDiscriminator.parameters(), lr=self.hps.lr, betas=betas)
 
     def save_model(self, model_path, iteration, enc_only=True):
         if not enc_only:
