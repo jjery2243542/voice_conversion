@@ -14,6 +14,12 @@ from torch.utils import data
 from tensorboardX import SummaryWriter
 from torch.autograd import Variable
 
+def cc(net):
+    if torch.cuda.is_available():
+        return net.cuda()
+    else:
+        return net
+
 def cal_mean_grad(net):
     grad = Variable(torch.FloatTensor([0])).cuda()
     for i, p in enumerate(net.parameters()):
