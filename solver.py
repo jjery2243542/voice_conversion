@@ -215,6 +215,7 @@ class Solver(object):
                 loss_rec = torch.mean(torch.abs(x_tilde - x))
                 # classify speaker
                 logits = self.clf_step(enc)
+                acc = cal_acc(logits, c)
                 loss_clf = self.cal_loss(logits, c)
                 # maximize classification loss
                 loss = loss_rec - current_alpha * loss_clf
