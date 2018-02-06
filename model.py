@@ -147,6 +147,7 @@ class PatchDiscriminator(nn.Module):
         out = self.conv_block(out, self.conv3, [self.ins_norm3, self.drop3])
         out = self.conv_block(out, self.conv4, [self.ins_norm4, self.drop4])
         out = self.conv_block(out, self.conv5, [self.ins_norm5, self.drop5])
+        print(out.size())
         # GAN output value
         val = pad_layer(out, self.conv6, is_2d=True)
         val = val.view(val.size(0), -1)
@@ -154,7 +155,6 @@ class PatchDiscriminator(nn.Module):
         if classify:
             # classify
             logits = self.conv_classify(out)
-            print(logits.size())
             logits = logits.view(logits.size(0), -1)
             return mean_val, logits
         else:
@@ -483,12 +483,12 @@ if __name__ == '__main__':
     #cbhg = CBHG().cuda()
     inp = Variable(torch.randn(16, 513, 128)).cuda()
     e1 = E1(inp)
-    print(e1.size())
-    s1 = S(e1, gr=True)
+    #print(e1.size())
+    s1 = S(e1)
     c = Variable(torch.from_numpy(np.random.randint(8, size=(16)))).cuda()
     d = D(e1, c)
-    print(d.size())
+    #print(d.size())
     p1, p2 = P(d, classify=True)
     print(p1.size(), p2.size())
     c = C(torch.cat([e1, e1],dim=1))
-    print(c.size())
+    #print(c.size())
