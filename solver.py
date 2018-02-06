@@ -97,7 +97,7 @@ class Solver(object):
 
     def permute_data(self, data):
         C = to_var(data[0], requires_grad=False)
-        X = to_var(data[2]).permute(0, 2, 1)
+        X = to_var(data[1]).permute(0, 2, 1)
         return C, X
 
     def sample_c(self, size):
