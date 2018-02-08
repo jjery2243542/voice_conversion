@@ -260,6 +260,8 @@ class Solver(object):
                 print(log % slot_value)
                 for tag, value in info.items():
                     self.logger.scalar_summary(tag, value, iteration + 1)
+                if iteration % 1000 == 0 or iteration + 1 == hps.iters:
+                    self.save_model(model_path, iteration + hps.iters)
         elif mode == 'train':
             for iteration in range(hps.iters):
                 # calculate current alpha
