@@ -1,0 +1,1 @@
+CUDA_VISIBLE_DEVICES=0 python3.6 -u main.py --single -flag v22_10 -hps_path hps/v22.json -index_path /storage/feature/voice_conversion/vctk/trim_sin_128_513_2000k.json -dataset_path /storage/feature/voice_conversion/vctk/trim_log_vctk.pkl -output_model_path /storage/model/voice_conversion/v22/10_model.pkl
