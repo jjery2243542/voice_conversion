@@ -286,8 +286,12 @@ class DataLoader(object):
         return tuple(batch_tensor)
 
 class SingleDataset(data.Dataset):
-    def __init__(self, h5_path, index_path, dset='train', seg_len=128):
-        self.h5 = h5py.File(h5_path, 'r')
+    def __init__(self, file_path, index_path, dset='train', seg_len=128, is_h5=False):
+        if is_h5:
+            self.dataset = h5py.File(file_path, 'r')
+        else:
+            with open(file_path, 'rb') as f:
+                self.dataset = pickle.load(f)
         with open(index_path) as f_index:
             self.indexes = json.load(f_index)
         self.indexer = namedtuple('index', ['speaker', 'i', 't'])
@@ -300,7 +304,7 @@ class SingleDataset(data.Dataset):
         speaker = index.speaker
         i, t = index.i, index.t
         seg_len = self.seg_len
-        data = [speaker, self.h5[f'{self.dset}/{i}/lin'][t:t+seg_len]]
+        data = [speaker, self.dataset[f'{self.dset}/{i}/lin'][t:t+seg_len]]
         return tuple(data)
 
     def __len__(self):
@@ -342,7 +346,7 @@ class Logger(object):
 
 if __name__ == '__main__':
     hps = Hps()
-    hps.dump('./hps/v20.json')
+    hps.dump('./hps/v22.json')
     #dataset = myDataset('/storage/feature/voice_conversion/vctk/en_norm_mcep_vctk.h5',\
     #        '/storage/feature/voice_conversion/vctk/mc_128_26_2000k.json')
     #data_loader = DataLoader(dataset)
