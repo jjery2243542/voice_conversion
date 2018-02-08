@@ -97,6 +97,7 @@ def reduce_frames(arry, step, r):
      
     Returns:
       A 2d array with shape of [-1, C*r]
+<<<<<<< 2b70e2092593744c2d202685786864bd95f9eb70
     '''
     T = arry.shape[0]
     num_padding = (step*r) - (T % (step*r)) if T % (step*r) !=0 else 0
@@ -116,7 +117,26 @@ def reduce_frames(arry, step, r):
     return reshaped
 
 def spectrogram2wav(spectrogram):
+    T = arry.shape[0]
+    num_padding = (step*r) - (T % (step*r)) if T % (step*r) !=0 else 0
+    
+    arry = np.pad(arry, [[0, num_padding], [0, 0]], 'constant', constant_values=(0, 0))
+    T, C = arry.shape
+    sliced = np.split(arry, list(range(step, T, step)), axis=0)
+    
+    started = False
+    for i in range(0, len(sliced), r):
+        if not started:
+            reshaped = np.hstack(sliced[i:i+r])
+            started = True
+        else:
+            reshaped = np.vstack((reshaped, np.hstack(sliced[i:i+r])))
+            
+    return reshaped
+
+def spectrogram2wav(spectrogram):
     '''
+>>>>>>> can run
     spectrogram: [t, f], i.e. [t, nfft // 2 + 1]
     '''
     spectrogram = spectrogram.T  # [f, t]
@@ -162,4 +182,3 @@ def restore_shape(arry, step, r):
     # Trim zero paddings
     restored = restored[:np.count_nonzero(restored.sum(axis=1))]    
     return restored
-

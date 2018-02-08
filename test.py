@@ -91,5 +91,6 @@ if __name__ == '__main__':
         result = result.squeeze(axis=0).transpose((1, 0))
         results.append(result)
         for i, result in enumerate(results):
+            result = np.power(np.e, result)**1.2
             wav_data = spectrogram2wav(result)
             write(f'output{i+1}.wav', rate=16000, data=wav_data)

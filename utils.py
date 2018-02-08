@@ -308,7 +308,7 @@ class SingleDataset(data.Dataset):
         speaker = index.speaker
         i, t = index.i, index.t
         seg_len = self.seg_len
-        data = [speaker, self.h5[f'{self.dset}/{i}/lin'][t:t+seg_len]]
+        data = [speaker, self.dataset[f'{self.dset}/{i}/lin'][t:t+seg_len]]
         return tuple(data)
 
     def __len__(self):
@@ -351,10 +351,10 @@ class Logger(object):
 if __name__ == '__main__':
     hps = Hps()
     hps.dump('./hps/vcc.json')
-    dataset = SingleDataset('/nfs/Mazu/jjery2243542/voice_conversion/datasets/vcc/trim_log.pkl',\
-            '/nfs/Mazu/jjery2243542/voice_conversion/datasets/vcc/train_64.json', seg_len=64)
-    d = dataset[0]
-    print(d[0], d[1].shape)
+    #dataset = SingleDataset('/nfs/Mazu/jjery2243542/voice_conversion/datasets/vcc/trim_log.pkl',\
+    #        '/nfs/Mazu/jjery2243542/voice_conversion/datasets/vcc/train_64.json', seg_len=64)
+    #d = dataset[0]
+    #print(d[0], d[1].shape)
     #data_loader = DataLoader(dataset)
     #for i, batch in enumerate(data_loader):
     #    print(torch.max(batch[2]))
