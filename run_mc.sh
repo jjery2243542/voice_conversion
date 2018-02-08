@@ -1,1 +1,0 @@
-CUDA_VISIBLE_DEVICES=0 python3.6 -u main.py -flag v19 -hps_path hps/v19.json -index_path /storage/feature/voice_conversion/vctk/mc_128_26_2000k.json -dataset_path /storage/feature/voice_conversion/vctk/en_norm_mcep_vctk.h5 -output_model_path /storage/model/voice_conversion/v18/mc_model.pkl | tee train_v19.log

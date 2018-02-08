@@ -8,6 +8,7 @@ import pickle
 from utils import myDataset
 from utils import SingleDataset
 from model import SpeakerClassifier
+from model import WeakSpeakerClassifier
 from model import Encoder
 import os
 from utils import Hps
@@ -33,7 +34,7 @@ class Classifier(object):
 
     def build_model(self):
         hps = self.hps
-        self.SpeakerClassifier = SpeakerClassifier(ns=hps.ns, dp=hps.dis_dp, n_class=hps.n_speakers)
+        self.SpeakerClassifier = WeakSpeakerClassifier(ns=hps.ns, dp=hps.dis_dp, n_class=hps.n_speakers)
         self.Encoder = Encoder(ns=hps.ns, dp=hps.enc_dp)
         if torch.cuda.is_available():
             self.SpeakerClassifier.cuda()
