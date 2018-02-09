@@ -119,7 +119,7 @@ class PatchDiscriminator(nn.Module):
         self.conv3 = nn.Conv2d(128, 256, kernel_size=5, stride=2)
         self.conv4 = nn.Conv2d(256, 512, kernel_size=5, stride=2)
         self.conv5 = nn.Conv2d(512, 512, kernel_size=5, stride=2)
-        self.conv6 = nn.Conv2d(512, 1, kernel_size=1)
+        self.conv6 = nn.Conv2d(512, 1, kernel_size=(17, 4))
         #self.conv_classify = nn.Conv2d(512, n_class, kernel_size=(17, 4))
         self.conv_classify = nn.Conv2d(512, n_class, kernel_size=(17, 4))
         self.drop1 = nn.Dropout2d(p=dp)
@@ -147,9 +147,8 @@ class PatchDiscriminator(nn.Module):
         out = self.conv_block(out, self.conv3, [self.ins_norm3, self.drop3])
         out = self.conv_block(out, self.conv4, [self.ins_norm4, self.drop4])
         out = self.conv_block(out, self.conv5, [self.ins_norm5, self.drop5])
-        print(out.size())
         # GAN output value
-        val = pad_layer(out, self.conv6, is_2d=True)
+        val = self.conv6(out)
         val = val.view(val.size(0), -1)
         mean_val = torch.mean(val, dim=1)
         if classify:

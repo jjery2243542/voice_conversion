@@ -23,7 +23,7 @@ from utils import multiply_grad
 from utils import grad_clip
 from utils import cal_acc
 from utils import cc
-#from utils import calculate_gradients_penalty
+from utils import calculate_gradients_penalty
 #from preprocess.tacotron import utils
 
 class Solver(object):
@@ -43,7 +43,7 @@ class Solver(object):
         self.Decoder = cc(Decoder(ns=ns, c_a=hps.n_speakers, emb_size=emb_size))
         self.Generator = cc(Decoder(ns=ns, c_a=hps.n_speakers, emb_size=emb_size))
         self.SpeakerClassifier = cc(SpeakerClassifier(ns=ns, n_class=hps.n_speakers, dp=hps.dis_dp))
-        self.PatchDiscriminator = cc(PatchDiscriminator(ns=ns, n_class=hps.n_speakers))
+        self.PatchDiscriminator = cc(PatchDiscriminator(ns=ns, n_class=hps.n_speakers, dp=hps.dis_dp))
         betas = (0.5, 0.9)
         params = list(self.Encoder.parameters()) + list(self.Decoder.parameters())
         self.ae_opt = optim.Adam(params, lr=self.hps.lr, betas=betas)
@@ -81,7 +81,7 @@ class Solver(object):
             all_model = torch.load(f_in)
             self.Encoder.load_state_dict(all_model['encoder'])
             self.Decoder.load_state_dict(all_model['decoder'])
-            self.Generator.load_state_dict(all_model['generator'])
+            #self.Generator.load_state_dict(all_model['generator'])
             if not enc_only:
                 self.SpeakerClassifier.load_state_dict(all_model['classifier'])
                 self.PatchDiscriminator.load_state_dict(all_model['patch_discriminator'])
@@ -131,10 +131,12 @@ class Solver(object):
             gp = calculate_gradients_penalty(self.PatchDiscriminator, x, x_tilde)
             return w_dis, real_logits, gp
         else:
-            return -D_fake, fake_logits
+            mean_D_fake = torch.mean(D_fake)
+            return mean_D_fake, fake_logits
 
     def gen_step(self, enc, c):
         x_gen = self.Decoder(enc, c) + self.Generator(enc, c)
+        #x_gen = self.Generator(enc, c)
         return x_gen 
 
     def clf_step(self, enc):
@@ -221,12 +223,12 @@ class Solver(object):
                     acc = cal_acc(real_logits, c)
                     info = {
                         f'{flag}/w_dis': w_dis.data[0],
-                        f'{flag}/gp': gp.data[0], 
                         f'{flag}/real_loss_clf': loss_clf.data[0],
                         f'{flag}/real_acc': acc, 
+                        f'{flag}/gp': gp.data[0], 
                     }
                     slot_value = (step, iteration+1, hps.patch_iters) + tuple([value for value in info.values()])
-                    log = 'patch_D-%d:[%06d/%06d], w_dis=%.2f, gp=%.2f, loss_clf=%.2f, acc=%.2f'
+                    log = 'patch_D-%d:[%06d/%06d], w_dis=%.2f, loss_clf=%.2f, acc=%.2f, gp=%.2f'
                     print(log % slot_value)
                     for tag, value in info.items():
                         self.logger.scalar_summary(tag, value, iteration + 1)
@@ -240,10 +242,10 @@ class Solver(object):
                 # generator
                 x_tilde = self.gen_step(enc, c_prime)
                 # discriminstor
-                loss_adv, fake_logits = self.patch_step(x, x_tilde, is_dis=False)
+                D_fake, fake_logits = self.patch_step(x, x_tilde, is_dis=False)
                 # aux classification loss 
                 loss_clf = self.cal_loss(fake_logits, c_prime)
-                loss = hps.beta_clf * loss_clf + hps.beta_gen * loss_adv
+                loss = hps.beta_clf * loss_clf - hps.beta_gen * D_fake
                 reset_grad([self.Generator])
                 loss.backward()
                 grad_clip([self.Generator], self.hps.max_grad_norm)
@@ -251,12 +253,12 @@ class Solver(object):
                 # calculate acc
                 acc = cal_acc(fake_logits, c_prime)
                 info = {
-                    f'{flag}/loss_adv': loss_adv.data[0],
+                    f'{flag}/D_fake': D_fake.data[0],
                     f'{flag}/fake_loss_clf': loss_clf.data[0],
                     f'{flag}/fake_acc': acc, 
                 }
-                slot_value = (step, iteration+1, hps.patch_iters) + tuple([value for value in info.values()])
-                log = 'patch_G:[%06d/%06d], loss_adv=%.2f, loss_clf=%.2f, acc=%.2f'
+                slot_value = (iteration+1, hps.patch_iters) + tuple([value for value in info.values()])
+                log = 'patch_G:[%06d/%06d], D_fake=%.2f, loss_clf=%.2f, acc=%.2f'
                 print(log % slot_value)
                 for tag, value in info.items():
                     self.logger.scalar_summary(tag, value, iteration + 1)
