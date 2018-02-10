@@ -20,7 +20,7 @@ if __name__ == '__main__':
     hps.load('./hps/ae.json')
     hps_tuple = hps.get_tuple()
     solver = Solver(hps_tuple, None)
-    solver.load_model('/storage/model/voice_conversion/v22/model.pkl-59999')
+    solver.load_model('/storage/model/voice_conversion/v22/proj_model.pkl-59999')
     if feature == 'mc':
         # indexer to extract data
         indexer = Indexer()

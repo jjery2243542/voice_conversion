@@ -9,9 +9,10 @@ from utils import myDataset
 from model import Encoder
 from model import Decoder
 from model import SpeakerClassifier
-from model import WeakSpeakerClassifier
+from model import SpectrogramClassifier
+#from model import WeakSpeakerClassifier
 #from model import LatentDiscriminator
-from model import PatchDiscriminator
+#from model import PatchDiscriminator
 from model import CBHG
 import os
 from utils import Hps
@@ -41,30 +42,27 @@ class Solver(object):
         emb_size = self.hps.emb_size
         self.Encoder = cc(Encoder(ns=ns, dp=hps.enc_dp))
         self.Decoder = cc(Decoder(ns=ns, c_a=hps.n_speakers, emb_size=emb_size))
-        self.Generator = cc(Decoder(ns=ns, c_a=hps.n_speakers, emb_size=emb_size))
         self.SpeakerClassifier = cc(SpeakerClassifier(ns=ns, n_class=hps.n_speakers, dp=hps.dis_dp))
-        self.PatchDiscriminator = cc(PatchDiscriminator(ns=ns, n_class=hps.n_speakers, dp=hps.dis_dp))
+        self.SpectrogramClassifier = cc(SpectrogramClassifier(ns=ns, n_class=hps.n_speakers, dp=hps.dis_dp))
         betas = (0.5, 0.9)
         params = list(self.Encoder.parameters()) + list(self.Decoder.parameters())
         self.ae_opt = optim.Adam(params, lr=self.hps.lr, betas=betas)
+        self.dec_opt = optim.Adam(params, lr=self.hps.lr, betas=betas)
         self.clf_opt = optim.Adam(self.SpeakerClassifier.parameters(), lr=self.hps.lr, betas=betas)
-        self.gen_opt = optim.Adam(self.Generator.parameters(), lr=self.hps.lr, betas=betas)
-        self.patch_opt = optim.Adam(self.PatchDiscriminator.parameters(), lr=self.hps.lr, betas=betas)
+        self.spec_clf_opt = optim.Adam(self.SpectrogramClassifier.parameters(), lr=self.hps.lr, betas=betas)
 
     def save_model(self, model_path, iteration, enc_only=True):
         if not enc_only:
             all_model = {
                 'encoder': self.Encoder.state_dict(),
                 'decoder': self.Decoder.state_dict(),
-                'generator': self.Generator.state_dict(),
                 'classifier': self.SpeakerClassifier.state_dict(),
-                'patch_discriminator': self.PatchDiscriminator.state_dict(),
+                'spectrogram_classifier': self.SpectrogramClassifier.state_dict(),
             }
         else:
             all_model = {
                 'encoder': self.Encoder.state_dict(),
                 'decoder': self.Decoder.state_dict(),
-                'generator': self.Generator.state_dict(),
             }
         new_model_path = '{}-{}'.format(model_path, iteration)
         with open(new_model_path, 'wb') as f_out:
@@ -84,22 +82,19 @@ class Solver(object):
             #self.Generator.load_state_dict(all_model['generator'])
             if not enc_only:
                 self.SpeakerClassifier.load_state_dict(all_model['classifier'])
-                self.PatchDiscriminator.load_state_dict(all_model['patch_discriminator'])
+                #self.PatchDiscriminator.load_state_dict(all_model['patch_discriminator'])
 
     def set_eval(self):
         self.Encoder.eval()
         self.Decoder.eval()
-        self.Generator.eval()
         self.SpeakerClassifier.eval()
-        self.PatchDiscriminator.eval()
+        self.SpectrogramClassifier.eval()
 
     def test_step(self, x, c, gen=False):
         self.set_eval()
         x = to_var(x).permute(0, 2, 1)
         enc = self.Encoder(x)
         x_tilde = self.Decoder(enc, c)
-        if gen:
-            x_tilde += self.Generator(enc, c)
         return x_tilde.data.cpu().numpy()
 
     def permute_data(self, data):
@@ -133,6 +128,10 @@ class Solver(object):
         else:
             mean_D_fake = torch.mean(D_fake)
             return mean_D_fake, fake_logits
+
+    def spec_clf_step(self, x);
+        logits = self.SpectrogramClassifier(x)
+        return logits
 
     def gen_step(self, enc, c):
         x_gen = self.Decoder(enc, c) + self.Generator(enc, c)
@@ -198,72 +197,63 @@ class Solver(object):
                 print(log % slot_value)
                 for tag, value in info.items():
                     self.logger.scalar_summary(tag, value, iteration + 1)
-        elif mode == 'patchGAN':
-            for iteration in range(hps.patch_iters):
-                #=======train D=========#
+        elif mode == 'pretrain_spec_clf':
+            for iteration in range(hps.iters):
+                #==================train D==================#
                 for step in range(hps.n_patch_steps):
                     data = next(self.data_loader)
                     c, x = self.permute_data(data)
-                    # encode
-                    enc = self.encode_step(x)
-                    # sample c
-                    c_prime = self.sample_c(x.size(0))
-                    # generator
-                    x_tilde = self.gen_step(enc, c_prime)
-                    # discriminstor
-                    w_dis, real_logits, gp = self.patch_step(x, x_tilde, is_dis=True)
-                    # aux classification loss 
-                    loss_clf = self.cal_loss(real_logits, c)
-                    loss = -hps.beta_dis * w_dis + hps.beta_clf * loss_clf + hps.lambda_ * gp
-                    reset_grad([self.PatchDiscriminator])
+                    # classify speaker 
+                    logits = self.spec_clf_step(x)
+                    loss_clf = self.cal_loss(logits, c)
+                    loss = hps.beta_clf * loss_clf
+                    # update 
+                    reset_grad([self.SpectrogramClassifier])
                     loss.backward()
-                    grad_clip([self.PatchDiscriminator], self.hps.max_grad_norm)
-                    self.patch_opt.step()
+                    grad_clip([self.SpectrogramClassifier], self.hps.max_grad_norm)
+                    self.spec_clf_opt.step()
                     # calculate acc
-                    acc = cal_acc(real_logits, c)
+                    acc = cal_acc(logits, c)
                     info = {
-                        f'{flag}/w_dis': w_dis.data[0],
-                        f'{flag}/real_loss_clf': loss_clf.data[0],
-                        f'{flag}/real_acc': acc, 
-                        f'{flag}/gp': gp.data[0], 
+                        f'{flag}/D_loss_clf': loss_clf.data[0],
+                        f'{flag}/D_acc': acc,
                     }
-                    slot_value = (step, iteration+1, hps.patch_iters) + tuple([value for value in info.values()])
-                    log = 'patch_D-%d:[%06d/%06d], w_dis=%.2f, loss_clf=%.2f, acc=%.2f, gp=%.2f'
+                    slot_value = (step, iteration + 1, hps.iters) + tuple([value for value in info.values()])
+                    log = 'D-%d:[%06d/%06d], loss_clf=%.2f, acc=%.2f'
                     print(log % slot_value)
                     for tag, value in info.items():
                         self.logger.scalar_summary(tag, value, iteration + 1)
-                #=======train G=========#
+                #==================train G==================#
                 data = next(self.data_loader)
                 c, x = self.permute_data(data)
                 # encode
                 enc = self.encode_step(x)
-                # sample c
-                c_prime = self.sample_c(x.size(0))
-                # generator
-                x_tilde = self.gen_step(enc, c_prime)
-                # discriminstor
-                D_fake, fake_logits = self.patch_step(x, x_tilde, is_dis=False)
-                # aux classification loss 
-                loss_clf = self.cal_loss(fake_logits, c_prime)
-                loss = hps.beta_clf * loss_clf - hps.beta_gen * D_fake
-                reset_grad([self.Generator])
+                # decode
+                x_tilde = self.decode_step(enc, c)
+                loss_rec = torch.mean(torch.abs(x_tilde - x))
+                # classify speaker
+                logits = self.clf_step(enc)
+                acc = cal_acc(logits, c)
+                loss_clf = self.cal_loss(logits, c)
+                # maximize classification loss
+                loss = loss_rec - current_alpha * loss_clf
+                reset_grad([self.Encoder, self.Decoder])
                 loss.backward()
-                grad_clip([self.Generator], self.hps.max_grad_norm)
-                self.gen_opt.step()
-                # calculate acc
-                acc = cal_acc(fake_logits, c_prime)
+                grad_clip([self.Encoder, self.Decoder], self.hps.max_grad_norm)
+                self.ae_opt.step()
                 info = {
-                    f'{flag}/D_fake': D_fake.data[0],
-                    f'{flag}/fake_loss_clf': loss_clf.data[0],
-                    f'{flag}/fake_acc': acc, 
+                    f'{flag}/loss_rec': loss_rec.data[0],
+                    f'{flag}/G_loss_clf': loss_clf.data[0],
+                    f'{flag}/alpha': current_alpha,
+                    f'{flag}/G_acc': acc,
                 }
-                slot_value = (iteration+1, hps.patch_iters) + tuple([value for value in info.values()])
-                log = 'patch_G:[%06d/%06d], D_fake=%.2f, loss_clf=%.2f, acc=%.2f'
+                slot_value = (iteration + 1, hps.iters) + tuple([value for value in info.values()])
+                log = 'G:[%06d/%06d], loss_rec=%.2f, loss_clf=%.2f, alpha=%.2e, acc=%.2f'
                 print(log % slot_value)
                 for tag, value in info.items():
                     self.logger.scalar_summary(tag, value, iteration + 1)
                 if iteration % 1000 == 0 or iteration + 1 == hps.iters:
-                    self.save_model(model_path, iteration + hps.iters)
+                    self.save_model(model_path, iteration)
         elif mode == 'train':
             for iteration in range(hps.iters):
                 # calculate current alpha
