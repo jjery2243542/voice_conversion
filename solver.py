@@ -47,7 +47,6 @@ class Solver(object):
         betas = (0.5, 0.9)
         params = list(self.Encoder.parameters()) + list(self.Decoder.parameters())
         self.ae_opt = optim.Adam(params, lr=self.hps.lr, betas=betas)
-        self.dec_opt = optim.Adam(params, lr=self.hps.lr, betas=betas)
         self.clf_opt = optim.Adam(self.SpeakerClassifier.parameters(), lr=self.hps.lr, betas=betas)
         self.spec_clf_opt = optim.Adam(self.SpectrogramClassifier.parameters(), lr=self.hps.lr, betas=betas)
 
@@ -129,7 +128,7 @@ class Solver(object):
             mean_D_fake = torch.mean(D_fake)
             return mean_D_fake, fake_logits
 
-    def spec_clf_step(self, x);
+    def spec_clf_step(self, x):
         logits = self.SpectrogramClassifier(x)
         return logits
 
@@ -197,70 +196,37 @@ class Solver(object):
                 print(log % slot_value)
                 for tag, value in info.items():
                     self.logger.scalar_summary(tag, value, iteration + 1)
-        elif mode == 'pretrain_spec_clf':
-            for iteration in range(hps.iters):
-                #==================train D==================#
-                for step in range(hps.n_patch_steps):
-                    data = next(self.data_loader)
-                    c, x = self.permute_data(data)
-                    # classify speaker 
-                    logits = self.spec_clf_step(x)
-                    loss_clf = self.cal_loss(logits, c)
-                    loss = hps.beta_clf * loss_clf
-                    # update 
-                    reset_grad([self.SpectrogramClassifier])
-                    loss.backward()
-                    grad_clip([self.SpectrogramClassifier], self.hps.max_grad_norm)
-                    self.spec_clf_opt.step()
-                    # calculate acc
-                    acc = cal_acc(logits, c)
-                    info = {
-                        f'{flag}/D_loss_clf': loss_clf.data[0],
-                        f'{flag}/D_acc': acc,
-                    }
-                    slot_value = (step, iteration + 1, hps.iters) + tuple([value for value in info.values()])
-                    log = 'D-%d:[%06d/%06d], loss_clf=%.2f, acc=%.2f'
-                    print(log % slot_value)
-                    for tag, value in info.items():
-                        self.logger.scalar_summary(tag, value, iteration + 1)
-                #==================train G==================#
+        elif mode == 'pretrain_clf':
+            for iteration in range(hps.patch_iters):
                 data = next(self.data_loader)
                 c, x = self.permute_data(data)
-                # encode
-                enc = self.encode_step(x)
-                # decode
-                x_tilde = self.decode_step(enc, c)
-                loss_rec = torch.mean(torch.abs(x_tilde - x))
-                # classify speaker
-                logits = self.clf_step(enc)
-                acc = cal_acc(logits, c)
-                loss_clf = self.cal_loss(logits, c)
-                # maximize classification loss
-                loss = loss_rec - current_alpha * loss_clf
-                reset_grad([self.Encoder, self.Decoder])
+                # classify speaker 
+                logits = self.spec_clf_step(x)
+                loss = self.cal_loss(logits, c)
+                # update 
+                reset_grad([self.SpectrogramClassifier])
                 loss.backward()
-                grad_clip([self.Encoder, self.Decoder], self.hps.max_grad_norm)
-                self.ae_opt.step()
+                grad_clip([self.SpectrogramClassifier], self.hps.max_grad_norm)
+                self.spec_clf_opt.step()
+                # calculate acc
+                acc = cal_acc(logits, c)
                 info = {
-                    f'{flag}/loss_rec': loss_rec.data[0],
-                    f'{flag}/G_loss_clf': loss_clf.data[0],
-                    f'{flag}/alpha': current_alpha,
-                    f'{flag}/G_acc': acc,
+                    f'{flag}/spec_loss_clf': loss.data[0],
+                    f'{flag}/spec_acc': acc,
                 }
-                slot_value = (iteration + 1, hps.iters) + tuple([value for value in info.values()])
-                log = 'G:[%06d/%06d], loss_rec=%.2f, loss_clf=%.2f, alpha=%.2e, acc=%.2f'
+                slot_value = (iteration + 1, hps.patch_iters) + tuple([value for value in info.values()])
+                log = 'pre_clf:[%06d/%06d], loss_clf=%.2f, acc=%.2f'
                 print(log % slot_value)
                 for tag, value in info.items():
                     self.logger.scalar_summary(tag, value, iteration + 1)
-                if iteration % 1000 == 0 or iteration + 1 == hps.iters:
-                    self.save_model(model_path, iteration)
         elif mode == 'train':
             for iteration in range(hps.iters):
                 # calculate current alpha
                 if iteration < hps.lat_sched_iters:
                     current_alpha = hps.alpha_enc * (iteration / hps.lat_sched_iters)
+                    current_beta = hps.beta_clf * (iteration / hps.lat_sched_iters)
                 else:
-                    current_alpha = hps.alpha_enc
+                    current_alpha, current_beta = hps.alpha_enc, hps.beta_clf
                 #==================train D==================#
                 for step in range(hps.n_latent_steps):
                     data = next(self.data_loader)
@@ -295,12 +261,19 @@ class Solver(object):
                 # decode
                 x_tilde = self.decode_step(enc, c)
                 loss_rec = torch.mean(torch.abs(x_tilde - x))
+                # permute speakers
+                enc_detached = enc.detach()
+                c_prime = self.sample_c(enc.size(0))
+                x_prime = self.decode_step(enc_detached, c_prime)
+                permuted_logits = self.SpectrogramClassifier(x_prime)
+                loss_spec_clf = self.cal_loss(permuted_logits, c_prime)
+                spec_acc = cal_acc(permuted_logits, c_prime)
                 # classify speaker
                 logits = self.clf_step(enc)
                 acc = cal_acc(logits, c)
                 loss_clf = self.cal_loss(logits, c)
                 # maximize classification loss
-                loss = loss_rec - current_alpha * loss_clf
+                loss = loss_rec + current_beta * loss_spec_clf - current_alpha * loss_clf
                 reset_grad([self.Encoder, self.Decoder])
                 loss.backward()
                 grad_clip([self.Encoder, self.Decoder], self.hps.max_grad_norm)
@@ -308,11 +281,15 @@ class Solver(object):
                 info = {
                     f'{flag}/loss_rec': loss_rec.data[0],
                     f'{flag}/G_loss_clf': loss_clf.data[0],
+                    f'{flag}/spec_loss_clf': loss_spec_clf.data[0],
                     f'{flag}/alpha': current_alpha,
+                    f'{flag}/beta': current_beta,
                     f'{flag}/G_acc': acc,
+                    f'{flag}/spec_acc': spec_acc,
                 }
                 slot_value = (iteration + 1, hps.iters) + tuple([value for value in info.values()])
-                log = 'G:[%06d/%06d], loss_rec=%.2f, loss_clf=%.2f, alpha=%.2e, acc=%.2f'
+                log = 'G:[%06d/%06d], loss_rec=%.2f, loss_clf=%.2f, loss_clf2=%.2f, alpha=%.2e, beta=%.2f, ' \
+                    'acc=%.2f, acc2=%.2f'
                 print(log % slot_value)
                 for tag, value in info.items():
                     self.logger.scalar_summary(tag, value, iteration + 1)
