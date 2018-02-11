@@ -370,19 +370,18 @@ class Decoder(nn.Module):
     def __init__(self, c_in=512, c_out=513, c_h=512, c_a=8, emb_size=128, ns=0.2):
         super(Decoder, self).__init__()
         self.ns = ns
-        self.conv1 = nn.Conv1d(c_in + emb_size, 2*c_h, kernel_size=3)
-        self.conv2 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=3)
-        self.conv3 = nn.Conv1d(c_h + emb_size, 2*c_h, kernel_size=3)
-        self.conv4 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=3)
-        self.conv5 = nn.Conv1d(c_h + emb_size, 2*c_h, kernel_size=3)
-        self.conv6 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=3)
-        self.dense1 = nn.Linear(c_h + emb_size, c_h)
-        self.dense2 = nn.Linear(c_h + emb_size, c_h)
-        self.dense3 = nn.Linear(c_h + emb_size, c_h)
-        self.dense4 = nn.Linear(c_h + emb_size, c_h)
-        self.RNN = nn.GRU(input_size=c_h + emb_size, hidden_size=c_h//2, num_layers=1, bidirectional=True)
-        self.emb = nn.Embedding(c_a, emb_size * 8)
-        self.dense5 = nn.Linear(2*c_h + emb_size, c_h)
+        self.conv1 = nn.Conv1d(c_in, 2*c_h, kernel_size=3)
+        self.conv2 = nn.Conv1d(c_h, c_h, kernel_size=3)
+        self.conv3 = nn.Conv1d(c_h, 2*c_h, kernel_size=3)
+        self.conv4 = nn.Conv1d(c_h, c_h, kernel_size=3)
+        self.conv5 = nn.Conv1d(c_h, 2*c_h, kernel_size=3)
+        self.conv6 = nn.Conv1d(c_h, c_h, kernel_size=3)
+        self.dense1 = nn.Linear(c_h, c_h)
+        self.dense2 = nn.Linear(c_h, c_h)
+        self.dense3 = nn.Linear(c_h, c_h)
+        self.dense4 = nn.Linear(c_h, c_h)
+        self.RNN = nn.GRU(input_size=c_h, hidden_size=c_h//2, num_layers=1, bidirectional=True)
+        self.dense5 = nn.Linear(2*c_h + c_h, c_h)
         self.linear = nn.Linear(c_h, c_out)
         # normalization layer
         self.ins_norm1 = nn.InstanceNorm1d(c_h)
@@ -390,21 +389,21 @@ class Decoder(nn.Module):
         self.ins_norm3 = nn.InstanceNorm1d(c_h)
         self.ins_norm4 = nn.InstanceNorm1d(c_h)
         self.ins_norm5 = nn.InstanceNorm1d(c_h)
-        # projection layer
-        self.proj1 = nn.Linear(emb_size * 8, emb_size)
-        self.proj2 = nn.Linear(emb_size * 8, emb_size)
-        self.proj3 = nn.Linear(emb_size * 8, emb_size)
-        self.proj4 = nn.Linear(emb_size * 8, emb_size)
-        self.proj5 = nn.Linear(emb_size * 8, emb_size)
+        # embedding layer
+        self.emb1 = nn.Embedding(c_a, c_h)
+        self.emb2 = nn.Embedding(c_a, c_h)
+        self.emb3 = nn.Embedding(c_a, c_h)
+        self.emb4 = nn.Embedding(c_a, c_h)
+        self.emb5 = nn.Embedding(c_a, c_h)
 
     def conv_block(self, x, conv_layers, norm_layer, emb, res=True):
         # first layer
-        x_append = append_emb(emb, x.size(2), x)
-        out = pad_layer(x_append, conv_layers[0])
+        x_add = x + emb.view(emb.size(0), emb.size(1), 1)
+        out = pad_layer(x_add, conv_layers[0])
         out = F.leaky_relu(out, negative_slope=self.ns)
         # upsample by pixelshuffle
         out = pixel_shuffle_1d(out, upscale_factor=2)
-        out = append_emb(emb, out.size(2), out)
+        out = out + emb.view(emb.size(0), emb.size(1), 1)
         out = pad_layer(out, conv_layers[1])
         out = F.leaky_relu(out, negative_slope=self.ns)
         out = norm_layer(out)
@@ -416,7 +415,7 @@ class Decoder(nn.Module):
     def dense_block(self, x, emb, layers, norm_layer, res=True):
         out = x
         for layer in layers:
-            out = append_emb(emb, out.size(2), out)
+            out = out + emb.view(emb.size(0), emb.size(1), 1)
             out = linear(out, layer)
             out = F.leaky_relu(out, negative_slope=self.ns)
         out = norm_layer(out)
@@ -425,19 +424,19 @@ class Decoder(nn.Module):
         return out
 
     def forward(self, x, c):
-        emb = self.emb(c)
         # conv layer
-        out = self.conv_block(x, [self.conv1, self.conv2], self.ins_norm1, self.proj1(emb), res=True )
-        out = self.conv_block(out, [self.conv3, self.conv4], self.ins_norm2, self.proj2(emb), res=True)
-        out = self.conv_block(out, [self.conv5, self.conv6], self.ins_norm3, self.proj3(emb), res=True)
+        out = self.conv_block(x, [self.conv1, self.conv2], self.ins_norm1, self.emb1(c), res=True )
+        out = self.conv_block(out, [self.conv3, self.conv4], self.ins_norm2, self.emb2(c), res=True)
+        out = self.conv_block(out, [self.conv5, self.conv6], self.ins_norm3, self.emb3(c), res=True)
         # dense layer
-        out = self.dense_block(out, self.proj4(emb), [self.dense1, self.dense2], self.ins_norm4, res=True)
-        out = self.dense_block(out, self.proj4(emb), [self.dense3, self.dense4], self.ins_norm5, res=True)
-        out_appended = append_emb(self.proj5(emb), out.size(2), out)
+        out = self.dense_block(out, self.emb4(c), [self.dense1, self.dense2], self.ins_norm4, res=True)
+        out = self.dense_block(out, self.emb4(c), [self.dense3, self.dense4], self.ins_norm5, res=True)
+        emb = self.emb5(c)
+        out_add = out + emb.view(emb.size(0), emb.size(1), 1)
         # rnn layer
-        out_rnn = RNN(out_appended, self.RNN)
+        out_rnn = RNN(out_add, self.RNN)
         out = torch.cat([out, out_rnn], dim=1)
-        out = append_emb(self.proj5(emb), out.size(2), out)
+        out = append_emb(self.emb5(c), out.size(2), out)
         out = linear(out, self.dense5)
         out = F.leaky_relu(out, negative_slope=self.ns)
         out = linear(out, self.linear)
