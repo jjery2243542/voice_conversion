@@ -110,6 +110,49 @@ def append_emb(emb, expand_size, output):
     output = torch.cat([output, emb_expand], dim=1)
     return output
 
+class SpectrogramClassifier(nn.Module):
+    def __init__(self, n_class=33, ns=0.2, dp=0.1):
+        super(SpectrogramClassifier, self).__init__()
+        self.ns = ns
+        self.conv1 = nn.Conv2d(1, 64, kernel_size=5, stride=2)
+        self.conv2 = nn.Conv2d(64, 128, kernel_size=5, stride=2)
+        self.conv3 = nn.Conv2d(128, 256, kernel_size=5, stride=2)
+        self.conv4 = nn.Conv2d(256, 512, kernel_size=5, stride=2)
+        self.conv5 = nn.Conv2d(512, 512, kernel_size=5, stride=2)
+        self.conv6 = nn.Conv2d(512, 1, kernel_size=1)
+        self.conv7 = nn.Conv2d(1, n_class, kernel_size=(17, 4))
+        self.drop1 = nn.Dropout2d(p=dp)
+        self.drop2 = nn.Dropout2d(p=dp)
+        self.drop3 = nn.Dropout2d(p=dp)
+        self.drop4 = nn.Dropout2d(p=dp)
+        self.drop5 = nn.Dropout2d(p=dp)
+        self.drop6 = nn.Dropout2d(p=dp)
+        self.ins_norm1 = nn.InstanceNorm2d(self.conv1.out_channels)
+        self.ins_norm2 = nn.InstanceNorm2d(self.conv2.out_channels)
+        self.ins_norm3 = nn.InstanceNorm2d(self.conv3.out_channels)
+        self.ins_norm4 = nn.InstanceNorm2d(self.conv4.out_channels)
+        self.ins_norm5 = nn.InstanceNorm2d(self.conv5.out_channels)
+        self.ins_norm6 = nn.InstanceNorm2d(self.conv6.out_channels)
+
+    def conv_block(self, x, conv_layer, after_layers):
+        out = pad_layer(x, conv_layer, is_2d=True)
+        out = F.leaky_relu(out, negative_slope=self.ns)
+        for layer in after_layers:
+            out = layer(out)
+        return out 
+
+    def forward(self, x):
+        x = torch.unsqueeze(x, dim=1)
+        out = self.conv_block(x, self.conv1, [self.ins_norm1, self.drop1])
+        out = self.conv_block(out, self.conv2, [self.ins_norm2, self.drop2])
+        out = self.conv_block(out, self.conv3, [self.ins_norm3, self.drop3])
+        out = self.conv_block(out, self.conv4, [self.ins_norm4, self.drop4])
+        out = self.conv_block(out, self.conv5, [self.ins_norm5, self.drop5])
+        out = self.conv_block(out, self.conv6, [self.ins_norm6, self.drop6])
+        logits = self.conv7(out)
+        logits = logits.view(logits.size(0), -1)
+        return logits
+
 class PatchDiscriminator(nn.Module):
     def __init__(self, n_class=33, ns=0.2, dp=0.1):
         super(PatchDiscriminator, self).__init__()
@@ -338,7 +381,7 @@ class Decoder(nn.Module):
         self.dense3 = nn.Linear(c_h + emb_size, c_h)
         self.dense4 = nn.Linear(c_h + emb_size, c_h)
         self.RNN = nn.GRU(input_size=c_h + emb_size, hidden_size=c_h//2, num_layers=1, bidirectional=True)
-        self.emb = nn.Embedding(c_a, emb_size)
+        self.emb = nn.Embedding(c_a, emb_size * 8)
         self.dense5 = nn.Linear(2*c_h + emb_size, c_h)
         self.linear = nn.Linear(c_h, c_out)
         # normalization layer
@@ -347,6 +390,12 @@ class Decoder(nn.Module):
         self.ins_norm3 = nn.InstanceNorm1d(c_h)
         self.ins_norm4 = nn.InstanceNorm1d(c_h)
         self.ins_norm5 = nn.InstanceNorm1d(c_h)
+        # projection layer
+        self.proj1 = nn.Linear(emb_size * 8, emb_size)
+        self.proj2 = nn.Linear(emb_size * 8, emb_size)
+        self.proj3 = nn.Linear(emb_size * 8, emb_size)
+        self.proj4 = nn.Linear(emb_size * 8, emb_size)
+        self.proj5 = nn.Linear(emb_size * 8, emb_size)
 
     def conv_block(self, x, conv_layers, norm_layer, emb, res=True):
         # first layer
@@ -378,17 +427,17 @@ class Decoder(nn.Module):
     def forward(self, x, c):
         emb = self.emb(c)
         # conv layer
-        out = self.conv_block(x, [self.conv1, self.conv2], self.ins_norm1, emb, res=True )
-        out = self.conv_block(out, [self.conv3, self.conv4], self.ins_norm2, emb, res=True)
-        out = self.conv_block(out, [self.conv5, self.conv6], self.ins_norm3, emb, res=True)
+        out = self.conv_block(x, [self.conv1, self.conv2], self.ins_norm1, self.proj1(emb), res=True )
+        out = self.conv_block(out, [self.conv3, self.conv4], self.ins_norm2, self.proj2(emb), res=True)
+        out = self.conv_block(out, [self.conv5, self.conv6], self.ins_norm3, self.proj3(emb), res=True)
         # dense layer
-        out = self.dense_block(out, emb, [self.dense1, self.dense2], self.ins_norm4, res=True)
-        out = self.dense_block(out, emb, [self.dense3, self.dense4], self.ins_norm5, res=True)
-        out_appended = append_emb(emb, out.size(2), out)
+        out = self.dense_block(out, self.proj4(emb), [self.dense1, self.dense2], self.ins_norm4, res=True)
+        out = self.dense_block(out, self.proj4(emb), [self.dense3, self.dense4], self.ins_norm5, res=True)
+        out_appended = append_emb(self.proj5(emb), out.size(2), out)
         # rnn layer
         out_rnn = RNN(out_appended, self.RNN)
         out = torch.cat([out, out_rnn], dim=1)
-        out = append_emb(emb, out.size(2), out)
+        out = append_emb(self.proj5(emb), out.size(2), out)
         out = linear(out, self.dense5)
         out = F.leaky_relu(out, negative_slope=self.ns)
         out = linear(out, self.linear)
