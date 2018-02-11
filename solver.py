@@ -18,6 +18,7 @@ import os
 from utils import Hps
 from utils import Logger
 from utils import DataLoader
+from utils import SingleDataset
 from utils import to_var
 from utils import reset_grad
 from utils import multiply_grad
@@ -82,6 +83,12 @@ class Solver(object):
             if not enc_only:
                 self.SpeakerClassifier.load_state_dict(all_model['classifier'])
                 #self.PatchDiscriminator.load_state_dict(all_model['patch_discriminator'])
+
+    def set_train(self):
+        self.Encoder.train()
+        self.Decoder.train()
+        self.SpeakerClassifier.train()
+        self.SpectrogramClassifier.train()
 
     def set_eval(self):
         self.Encoder.eval()
@@ -211,8 +218,8 @@ class Solver(object):
                 # calculate acc
                 acc = cal_acc(logits, c)
                 info = {
-                    f'{flag}/spec_loss_clf': loss.data[0],
-                    f'{flag}/spec_acc': acc,
+                    f'{flag}/pre_spec_loss_clf': loss.data[0],
+                    f'{flag}/pre_spec_acc': acc,
                 }
                 slot_value = (iteration + 1, hps.patch_iters) + tuple([value for value in info.values()])
                 log = 'pre_clf:[%06d/%06d], loss_clf=%.2f, acc=%.2f'
@@ -224,9 +231,8 @@ class Solver(object):
                 # calculate current alpha
                 if iteration < hps.lat_sched_iters:
                     current_alpha = hps.alpha_enc * (iteration / hps.lat_sched_iters)
-                    current_beta = hps.beta_clf * (iteration / hps.lat_sched_iters)
                 else:
-                    current_alpha, current_beta = hps.alpha_enc, hps.beta_clf
+                    current_alpha = hps.alpha_enc
                 #==================train D==================#
                 for step in range(hps.n_latent_steps):
                     data = next(self.data_loader)
@@ -265,7 +271,7 @@ class Solver(object):
                 enc_detached = enc.detach()
                 c_prime = self.sample_c(enc.size(0))
                 x_prime = self.decode_step(enc_detached, c_prime)
-                permuted_logits = self.SpectrogramClassifier(x_prime)
+                permuted_logits = self.spec_clf_step(x_prime)
                 loss_spec_clf = self.cal_loss(permuted_logits, c_prime)
                 spec_acc = cal_acc(permuted_logits, c_prime)
                 # classify speaker
@@ -273,7 +279,7 @@ class Solver(object):
                 acc = cal_acc(logits, c)
                 loss_clf = self.cal_loss(logits, c)
                 # maximize classification loss
-                loss = loss_rec + current_beta * loss_spec_clf - current_alpha * loss_clf
+                loss = loss_rec + hps.beta_clf * loss_spec_clf - current_alpha * loss_clf
                 reset_grad([self.Encoder, self.Decoder])
                 loss.backward()
                 grad_clip([self.Encoder, self.Decoder], self.hps.max_grad_norm)
@@ -283,13 +289,12 @@ class Solver(object):
                     f'{flag}/G_loss_clf': loss_clf.data[0],
                     f'{flag}/spec_loss_clf': loss_spec_clf.data[0],
                     f'{flag}/alpha': current_alpha,
-                    f'{flag}/beta': current_beta,
                     f'{flag}/G_acc': acc,
                     f'{flag}/spec_acc': spec_acc,
                 }
                 slot_value = (iteration + 1, hps.iters) + tuple([value for value in info.values()])
-                log = 'G:[%06d/%06d], loss_rec=%.2f, loss_clf=%.2f, loss_clf2=%.2f, alpha=%.2e, beta=%.2f, ' \
-                    'acc=%.2f, acc2=%.2f'
+                log = 'G:[%06d/%06d], loss_rec=%.2f, G_loss_clf=%.2f, loss_clf=%.2f, alpha=%.2e, ' \
+                        'G_acc=%.2f, acc=%.2f'
                 print(log % slot_value)
                 for tag, value in info.items():
                     self.logger.scalar_summary(tag, value, iteration + 1)

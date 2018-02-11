@@ -44,5 +44,5 @@ if __name__ == '__main__':
     if args.train:
         solver.train(args.output_model_path, args.flag, mode='pretrain_G')
         solver.train(args.output_model_path, args.flag, mode='pretrain_D')
+        solver.train(args.output_model_path, args.flag, mode='pretrain_clf')
         solver.train(args.output_model_path, args.flag, mode='train')
-        solver.train(args.output_model_path, args.flag, mode='patchGAN')
