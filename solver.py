@@ -96,12 +96,23 @@ class Solver(object):
         self.SpeakerClassifier.eval()
         self.SpectrogramClassifier.eval()
 
-    def test_step(self, x, c, gen=False):
+    def test_step(self, x, c):
         self.set_eval()
         x = to_var(x).permute(0, 2, 1)
         enc = self.Encoder(x)
         x_tilde = self.Decoder(enc, c)
         return x_tilde.data.cpu().numpy()
+
+    def mix_step(self, x, c1, c2):
+        self.set_eval()
+        x = to_var(x).permute(0, 2, 1)
+        enc = self.Encoder(x)
+        alphas = np.linspace(0., 1., 5)
+        x_tildes = []
+        for alpha in alphas: 
+            x_tilde = self.Decoder.decode(enc, c1, c2, alpha)
+            x_tildes.append(x_tilde.data.cpu().numpy())
+        return x_tildes
 
     def permute_data(self, data):
         C = to_var(data[0], requires_grad=False)

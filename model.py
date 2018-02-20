@@ -442,6 +442,30 @@ class Decoder(nn.Module):
         out = linear(out, self.linear)
         return out
 
+    def decode(self, x, c1, c2, alpha):
+        emb1 = self.emb1(c1) * alpha + self.emb1(c2) * (1 - alpha) 
+        emb2 = self.emb2(c1) * alpha + self.emb2(c2) * (1 - alpha) 
+        emb3 = self.emb3(c1) * alpha + self.emb3(c2) * (1 - alpha) 
+        emb4 = self.emb4(c1) * alpha + self.emb4(c2) * (1 - alpha) 
+        emb5 = self.emb5(c1) * alpha + self.emb5(c2) * (1 - alpha) 
+        # conv layer
+        out = self.conv_block(x, [self.conv1, self.conv2], self.ins_norm1, emb1, res=True )
+        out = self.conv_block(out, [self.conv3, self.conv4], self.ins_norm2, emb2, res=True)
+        out = self.conv_block(out, [self.conv5, self.conv6], self.ins_norm3, emb3, res=True)
+        # dense layer
+        out = self.dense_block(out, emb4, [self.dense1, self.dense2], self.ins_norm4, res=True)
+        out = self.dense_block(out, emb4, [self.dense3, self.dense4], self.ins_norm5, res=True)
+        emb = emb5
+        out_add = out + emb.view(emb.size(0), emb.size(1), 1)
+        # rnn layer
+        out_rnn = RNN(out_add, self.RNN)
+        out = torch.cat([out, out_rnn], dim=1)
+        out = append_emb(emb5, out.size(2), out)
+        out = linear(out, self.dense5)
+        out = F.leaky_relu(out, negative_slope=self.ns)
+        out = linear(out, self.linear)
+        return out
+
 class Encoder(nn.Module):
     def __init__(self, c_in=513, c_h1=128, c_h2=512, c_h3=128, ns=0.2, dp=0.5):
         super(Encoder, self).__init__()

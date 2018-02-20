@@ -17,10 +17,10 @@ from preprocess.tacotron.mcep import mc2wav
 if __name__ == '__main__':
     feature = 'sp'
     hps = Hps()
-    hps.load('./hps/ae.json')
+    hps.load('./hps/v25.json')
     hps_tuple = hps.get_tuple()
     solver = Solver(hps_tuple, None)
-    solver.load_model('/storage/model/voice_conversion/v23/clf_model.pkl-59999')
+    solver.load_model('/storage/model/voice_conversion/exp_model/0.1/v25_model.pkl')
     if feature == 'mc':
         # indexer to extract data
         indexer = Indexer()
@@ -58,7 +58,7 @@ if __name__ == '__main__':
             wav_data = mc2wav(log_f0, src_f0_mean, src_f0_std, tar_f0_mean, tar_f0_std, ap, truncated_result, mc_mean, mc_std)
             write(f'output{i+1}.wav', rate=16000, data=wav_data)
     else: 
-        spec = np.loadtxt('preprocess/test_code/lin.npy')
+        spec = np.loadtxt('preprocess/test_code/lin3.npy')
         spec2 = np.loadtxt('preprocess/test_code/lin2.npy')
         spec_expand = np.expand_dims(spec, axis=0)
         spec_tensor = torch.from_numpy(spec_expand)
@@ -68,20 +68,34 @@ if __name__ == '__main__':
         spec2_tensor = spec2_tensor.type(torch.FloatTensor)
         c1 = Variable(torch.from_numpy(np.array([0]))).cuda()
         c2 = Variable(torch.from_numpy(np.array([4]))).cuda()
+        c3 = Variable(torch.from_numpy(np.array([1]))).cuda()
+        c4 = Variable(torch.from_numpy(np.array([5]))).cuda()
         results = [spec, spec2]
-        result = solver.test_step(spec_tensor, c1, gen=False)
+        result = solver.test_step(spec_tensor, c1)
         result = result.squeeze(axis=0).transpose((1, 0))
         results.append(result)
-        result = solver.test_step(spec2_tensor, c2, gen=False)
+        result = solver.test_step(spec2_tensor, c2)
         result = result.squeeze(axis=0).transpose((1, 0))
         results.append(result)
-        result = solver.test_step(spec2_tensor, c1, gen=False)
+        result = solver.test_step(spec2_tensor, c1)
         result = result.squeeze(axis=0).transpose((1, 0))
         results.append(result)
-        result = solver.test_step(spec_tensor, c2, gen=False)
+        result = solver.test_step(spec_tensor, c2)
         result = result.squeeze(axis=0).transpose((1, 0))
         results.append(result)
-        for i, result in enumerate(results):
+        result = solver.test_step(spec_tensor, c3)
+        result = result.squeeze(axis=0).transpose((1, 0))
+        results.append(result)
+        result = solver.test_step(spec_tensor, c4)
+        result = result.squeeze(axis=0).transpose((1, 0))
+        results.append(result)
+        interpolates = solver.mix_step(spec_tensor, c1, c2)
+        interpolates = [sample.squeeze(axis=0).transpose((1, 0)) for sample in interpolates]
+        for i, result in enumerate(interpolates):
             result = np.power(np.e, result)**1.2
             wav_data = spectrogram2wav(result)
             write(f'output{i+1}.wav', rate=16000, data=wav_data)
+        #for i, result in enumerate(results):
+        #    result = np.power(np.e, result)**1.2
+        #    wav_data = spectrogram2wav(result)
+        #    write(f'output{i+1}.wav', rate=16000, data=wav_data)
