@@ -23,7 +23,7 @@ from utils import multiply_grad
 from utils import grad_clip
 from utils import cal_acc
 from utils import cc
-#from utils import calculate_gradients_penalty
+from utils import calculate_gradients_penalty
 #from preprocess.tacotron import utils
 
 class Solver(object):
