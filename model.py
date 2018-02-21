@@ -390,11 +390,7 @@ class Decoder(nn.Module):
         self.ins_norm4 = nn.InstanceNorm1d(c_h)
         self.ins_norm5 = nn.InstanceNorm1d(c_h)
         # embedding layer
-        self.emb1 = nn.Embedding(c_a, c_h)
-        self.emb2 = nn.Embedding(c_a, c_h)
-        self.emb3 = nn.Embedding(c_a, c_h)
-        self.emb4 = nn.Embedding(c_a, c_h)
-        self.emb5 = nn.Embedding(c_a, c_h)
+        self.embs = nn.ModuleList([nn.Embedding(c_a, c_h) for _ in range(5)])
 
     def conv_block(self, x, conv_layers, norm_layer, emb, res=True):
         # first layer
@@ -423,6 +419,7 @@ class Decoder(nn.Module):
             out = out + x
         return out
 
+    '''
     def forward(self, x, c):
         # conv layer
         out = self.conv_block(x, [self.conv1, self.conv2], self.ins_norm1, self.emb1(c), res=True )
@@ -441,26 +438,25 @@ class Decoder(nn.Module):
         out = F.leaky_relu(out, negative_slope=self.ns)
         out = linear(out, self.linear)
         return out
-
-    def decode(self, x, c1, c2, alpha):
-        emb1 = self.emb1(c1) * alpha + self.emb1(c2) * (1 - alpha) 
-        emb2 = self.emb2(c1) * alpha + self.emb2(c2) * (1 - alpha) 
-        emb3 = self.emb3(c1) * alpha + self.emb3(c2) * (1 - alpha) 
-        emb4 = self.emb4(c1) * alpha + self.emb4(c2) * (1 - alpha) 
-        emb5 = self.emb5(c1) * alpha + self.emb5(c2) * (1 - alpha) 
+    '''
+    def forward(self, x, c, c_prime=None, interpolate=False, alpha=0.8):
+        if interpolate:
+            embs = [emb_layer(c) * alpha + emb_layer(c_prime) * (1 - alpha) for emb_layer in self.embs]
+        else:
+            embs = [emb_layer(c) for emb_layer in self.embs]
         # conv layer
-        out = self.conv_block(x, [self.conv1, self.conv2], self.ins_norm1, emb1, res=True )
-        out = self.conv_block(out, [self.conv3, self.conv4], self.ins_norm2, emb2, res=True)
-        out = self.conv_block(out, [self.conv5, self.conv6], self.ins_norm3, emb3, res=True)
+        out = self.conv_block(x, [self.conv1, self.conv2], self.ins_norm1, embs[0], res=True )
+        out = self.conv_block(out, [self.conv3, self.conv4], self.ins_norm2, embs[1], res=True)
+        out = self.conv_block(out, [self.conv5, self.conv6], self.ins_norm3, embs[2], res=True)
         # dense layer
-        out = self.dense_block(out, emb4, [self.dense1, self.dense2], self.ins_norm4, res=True)
-        out = self.dense_block(out, emb4, [self.dense3, self.dense4], self.ins_norm5, res=True)
-        emb = emb5
+        out = self.dense_block(out, embs[3], [self.dense1, self.dense2], self.ins_norm4, res=True)
+        out = self.dense_block(out, embs[3], [self.dense3, self.dense4], self.ins_norm5, res=True)
+        emb = embs[4]
         out_add = out + emb.view(emb.size(0), emb.size(1), 1)
         # rnn layer
         out_rnn = RNN(out_add, self.RNN)
         out = torch.cat([out, out_rnn], dim=1)
-        out = append_emb(emb5, out.size(2), out)
+        out = append_emb(embs[4], out.size(2), out)
         out = linear(out, self.dense5)
         out = F.leaky_relu(out, negative_slope=self.ns)
         out = linear(out, self.linear)
@@ -556,10 +552,11 @@ if __name__ == '__main__':
     e1 = E1(inp)
     #print(e1.size())
     s1 = S(e1)
-    c = Variable(torch.from_numpy(np.random.randint(8, size=(16)))).cuda()
-    d = D(e1, c)
-    #print(d.size())
-    p1, p2 = P(d, classify=True)
-    print(p1.size(), p2.size())
-    c = C(torch.cat([e1, e1],dim=1))
+    c1 = Variable(torch.from_numpy(np.random.randint(8, size=(16)))).cuda()
+    c2 = Variable(torch.from_numpy(np.random.randint(8, size=(16)))).cuda()
+    d = D(e1, c1, c2, interpolate=True)
+    print(d.size())
+    #p1, p2 = P(d, classify=True)
+    #print(p1.size(), p2.size())
+    #c = C(torch.cat([e1, e1],dim=1))
     #print(c.size())
