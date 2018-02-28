@@ -52,9 +52,13 @@ def calculate_gradients_penalty(netD, real_data, fake_data):
 
     disc_interpolates = netD(interpolates)
 
+    use_cuda = torch.cuda.is_available()
+    grad_outputs = torch.ones(disc_interpolates.size()).cuda() if use_cuda else torch.ones(disc_interpolates.size())
+
     gradients = torch.autograd.grad(
-        outputs=torch.mean(disc_interpolates),
+        outputs=disc_interpolates,
         inputs=interpolates,
+        grad_outputs=grad_outputs,
         create_graph=True, retain_graph=True, only_inputs=True)[0]
     gradients_penalty = (1. - torch.sqrt(1e-12 + torch.sum(gradients.view(gradients.size(0), -1)**2, dim=1))) ** 2
     gradients_penalty = torch.mean(gradients_penalty)
