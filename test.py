@@ -9,7 +9,7 @@ from utils import Logger
 from utils import myDataset
 from utils import Indexer
 from solver import Solver
-from preprocess.tacotron.utils_backup import spectrogram2wav
+from preprocess.tacotron.utils import spectrogram2wav
 #from preprocess.tacotron.audio import inv_spectrogram, save_wav
 from scipy.io.wavfile import write
 from preprocess.tacotron.mcep import mc2wav
@@ -17,10 +17,10 @@ from preprocess.tacotron.mcep import mc2wav
 if __name__ == '__main__':
     feature = 'sp'
     hps = Hps()
-    hps.load('./hps/ori_v22.json')
+    hps.load('./hps/v25.json')
     hps_tuple = hps.get_tuple()
     solver = Solver(hps_tuple, None)
-    solver.load_model('/storage/model/voice_conversion/v22/model.pkl-59999')
+    solver.load_model('/storage/model/voice_conversion/v25/decouple_model.pkl-109999')
     if feature == 'mc':
         # indexer to extract data
         indexer = Indexer()
@@ -68,17 +68,25 @@ if __name__ == '__main__':
         spec2_tensor = spec2_tensor.type(torch.FloatTensor)
         c1 = Variable(torch.from_numpy(np.array([0]))).cuda()
         c2 = Variable(torch.from_numpy(np.array([4]))).cuda()
+        c3 = Variable(torch.from_numpy(np.array([1]))).cuda()
+        c4 = Variable(torch.from_numpy(np.array([5]))).cuda()
         results = [spec, spec2]
-        result = solver.test_step(spec_tensor, c1)
+        result = solver.test_step(spec_tensor, c1, gen=True)
         result = result.squeeze(axis=0).transpose((1, 0))
         results.append(result)
-        result = solver.test_step(spec2_tensor, c2)
+        result = solver.test_step(spec2_tensor, c2, gen=True)
         result = result.squeeze(axis=0).transpose((1, 0))
         results.append(result)
-        result = solver.test_step(spec2_tensor, c1)
+        result = solver.test_step(spec2_tensor, c1, gen=True)
         result = result.squeeze(axis=0).transpose((1, 0))
         results.append(result)
-        result = solver.test_step(spec_tensor, c2)
+        result = solver.test_step(spec_tensor, c2, gen=True)
+        result = result.squeeze(axis=0).transpose((1, 0))
+        results.append(result)
+        result = solver.test_step(spec_tensor, c3, gen=True)
+        result = result.squeeze(axis=0).transpose((1, 0))
+        results.append(result)
+        result = solver.test_step(spec_tensor, c4, gen=True)
         result = result.squeeze(axis=0).transpose((1, 0))
         results.append(result)
         for i, result in enumerate(results):
