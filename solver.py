@@ -31,7 +31,7 @@ class Solver(object):
         self.hps = hps
         self.data_loader = data_loader
         self.model_kept = []
-        self.max_keep = 20
+        self.max_keep = 30
         self.build_model()
         self.logger = Logger(log_dir)
 
@@ -131,7 +131,7 @@ class Solver(object):
             gp = calculate_gradients_penalty(self.PatchDiscriminator, x, x_tilde)
             return w_dis, real_logits, gp
         else:
-            return -D_fake, fake_logits
+            return -torch.mean(D_fake), fake_logits
 
     def gen_step(self, enc, c):
         x_gen = self.Decoder(enc, c) + self.Generator(enc, c)
@@ -255,11 +255,13 @@ class Solver(object):
                     f'{flag}/fake_loss_clf': loss_clf.data[0],
                     f'{flag}/fake_acc': acc, 
                 }
-                slot_value = (step, iteration+1, hps.patch_iters) + tuple([value for value in info.values()])
+                slot_value = (iteration+1, hps.patch_iters) + tuple([value for value in info.values()])
                 log = 'patch_G:[%06d/%06d], loss_adv=%.2f, loss_clf=%.2f, acc=%.2f'
                 print(log % slot_value)
                 for tag, value in info.items():
                     self.logger.scalar_summary(tag, value, iteration + 1)
+                if iteration % 1000 == 0 or iteration + 1 == hps.patch_iters:
+                    self.save_model(model_path, iteration + hps.iters)
         elif mode == 'train':
             for iteration in range(hps.iters):
                 # calculate current alpha
