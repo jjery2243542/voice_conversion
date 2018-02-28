@@ -2,9 +2,9 @@ import h5py
 import numpy as np
 import pickle 
 
-h5_path='/storage/feature/voice_conversion/vctk/trim_log_vctk.h5'
-pkl_path = '/storage/feature/voice_conversion/vctk/trim_log_vctk.pkl'
-speakers = ['225', '226', '227', '228', '229', '230', '232', '237']
+h5_path='/storage/feature/voice_conversion/vcc/trim_log.h5'
+pkl_path = '/storage/feature/voice_conversion/vcc/trim_log.pkl'
+speakers = ['SF1', 'SF2', 'SF3', 'SM1', 'SM2', 'TF1', 'TF2', 'TM1', 'TM2', 'TM3']
 
 dictionary = {}
 
