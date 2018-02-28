@@ -6,7 +6,7 @@ import numpy as np
 import json 
 
 max_step=5
-seg_len=128
+seg_len=64
 mel_band=80
 lin_band=513
 n_samples=20000

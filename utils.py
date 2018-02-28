@@ -128,7 +128,7 @@ class Sampler(object):
         self, 
         h5_path='/storage/feature/voice_conversion/vctk/en_norm_mcep_vctk.h5', 
         speaker_info_path='/storage/feature/voice_conversion/vctk/speaker-info.txt', 
-        utt_len_path='/storage/feature/voice_conversion/vctk/length.txt',
+        utt_len_path='/storage/feature/voice_conversion/vcc/length.txt',
         dset='train',
         max_step=5, 
         seg_len=128,
@@ -139,11 +139,12 @@ class Sampler(object):
         self.max_step = max_step
         self.seg_len = seg_len
         #self.read_sex_file(speaker_sex_path)
-        self.read_vctk_speaker_file(speaker_info_path)
+        #self.read_vctk_speaker_file(speaker_info_path)
         self.utt2len = self.read_utt_len_file(utt_len_path)
         self.speakers = list(self.f_h5[dset].keys())
-        self.n_speaker = n_speaker
-        self.speaker_used = self.female_ids[:n_speaker // 2] + self.male_ids[:n_speaker // 2]
+        #self.n_speaker = n_speaker
+        self.speaker_used = self.speakers
+        #self.speaker_used = self.female_ids[:n_speaker // 2] + self.male_ids[:n_speaker // 2]
         #self.speaker_used = ['225', '226', '227', '228', '229', '230', '232', '243']
         #self.speaker_used = self.accent['English']
         self.speaker2utts = {speaker:list(self.f_h5[f'{dset}/{speaker}'].keys()) \
