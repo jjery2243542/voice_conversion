@@ -15,7 +15,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--train', default=True, action='store_true')
     parser.add_argument('--test', default=False, action='store_true')
-    parser.add_argument('--single', default=False, action='store_true')
+    parser.add_argument('--single', default=True, action='store_true')
     parser.add_argument('--load_model', default=False, action='store_true')
     parser.add_argument('-flag', default='train')
     parser.add_argument('-hps_path', default='./hps/v7.json')
@@ -36,6 +36,7 @@ if __name__ == '__main__':
         dataset = SingleDataset(args.dataset_path,
                 args.index_path,
                 seg_len=hps_tuple.seg_len)
+
     data_loader = DataLoader(dataset)
 
     solver = Solver(hps_tuple, data_loader)

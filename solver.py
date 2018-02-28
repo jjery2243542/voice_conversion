@@ -31,7 +31,7 @@ class Solver(object):
         self.hps = hps
         self.data_loader = data_loader
         self.model_kept = []
-        self.max_keep = 30
+        self.max_keep = 100
         self.build_model()
         self.logger = Logger(log_dir)
 

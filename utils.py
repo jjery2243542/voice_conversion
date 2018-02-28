@@ -346,9 +346,11 @@ class Logger(object):
 
 if __name__ == '__main__':
     hps = Hps()
-    hps.dump('./hps/v23.json')
-    #dataset = myDataset('/storage/feature/voice_conversion/vctk/en_norm_mcep_vctk.h5',\
-    #        '/storage/feature/voice_conversion/vctk/mc_128_26_2000k.json')
+    hps.dump('./hps/vcc.json')
+    dataset = SingleDataset('/nfs/Mazu/jjery2243542/voice_conversion/datasets/vcc/trim_log.pkl',\
+            '/nfs/Mazu/jjery2243542/voice_conversion/datasets/vcc/train_64.json', seg_len=64)
+    d = dataset[0]
+    print(d[0], d[1].shape)
     #data_loader = DataLoader(dataset)
     #for i, batch in enumerate(data_loader):
     #    print(torch.max(batch[2]))
