@@ -6,6 +6,7 @@ import torch.nn.functional as F
 import numpy as np
 import pickle
 from utils import myDataset
+from utils import SingleDataset
 from model import SpeakerClassifier
 from model import Encoder
 import os
@@ -153,7 +154,7 @@ if __name__ == '__main__':
     parser.add_argument('-load_model_path', default='/storage/model/voice_conversion/'
             'pretrain_model.pkl-19999')
     parser.add_argument('-encoder_model_path', default='/storage/model/voice_conversion/v20/1000_model.pkl')
-    parser.add_argument('-dataset_path', default='/storage/feature/voice_conversion/vctk/log_vctk.h5')
+    parser.add_argument('-dataset_path', default='/storage/feature/voice_conversion/vcc/trim_log.pkl')
     parser.add_argument('-train_index_path', \
             default='/storage/feature/voice_conversion/vctk/128_513_2000k.json')
     parser.add_argument('-valid_index_path', \
@@ -163,10 +164,10 @@ if __name__ == '__main__':
     hps = Hps()
     hps.load(args.hps_path)
     hps_tuple = hps.get_tuple()
-    train_dataset = myDataset(args.dataset_path,
+    train_dataset = SingleDataset(args.dataset_path,
             args.train_index_path,
             seg_len=hps_tuple.seg_len)
-    valid_dataset = myDataset(args.dataset_path,
+    valid_dataset = SingleDataset(args.dataset_path,
             args.valid_index_path,
             dset='test',
             seg_len=hps_tuple.seg_len)
