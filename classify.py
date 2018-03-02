@@ -154,7 +154,7 @@ if __name__ == '__main__':
     parser.add_argument('-load_model_path', default='/storage/model/voice_conversion/'
             'pretrain_model.pkl-19999')
     parser.add_argument('-encoder_model_path', default='/storage/model/voice_conversion/v20/1000_model.pkl')
-    parser.add_argument('-dataset_path', default='/storage/feature/voice_conversion/vcc/trim_log.pkl')
+    parser.add_argument('-dataset_path', default='/storage/feature/voice_conversion/vcc/trim_log_pad.pkl')
     parser.add_argument('-train_index_path', \
             default='/storage/feature/voice_conversion/vctk/128_513_2000k.json')
     parser.add_argument('-valid_index_path', \
