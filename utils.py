@@ -292,10 +292,10 @@ class DataLoader(object):
 class SingleDataset(data.Dataset):
     def __init__(self, h5_path, index_path, dset='train', seg_len=128, is_h5=False):
         if is_h5:
-            self.h5 = h5py.File(h5_path, 'r')
+            self.dataset = h5py.File(h5_path, 'r')
         else:
             with open(h5_path, 'rb') as f:
-                self.h5 = pickle.load(f)
+                self.dataset = pickle.load(f)
         with open(index_path) as f_index:
             self.indexes = json.load(f_index)
         self.indexer = namedtuple('index', ['speaker', 'i', 't'])
