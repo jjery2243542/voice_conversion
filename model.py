@@ -114,15 +114,15 @@ class PatchDiscriminator(nn.Module):
     def __init__(self, n_class=33, ns=0.2, dp=0.1):
         super(PatchDiscriminator, self).__init__()
         self.ns = ns
-        self.conv1 = nn.Conv2d(1, 64, kernel_size=5, stride=2)
-        self.conv2 = nn.Conv2d(64, 128, kernel_size=5, stride=2)
-        self.conv3 = nn.Conv2d(128, 256, kernel_size=5, stride=2)
-        self.conv4 = nn.Conv2d(256, 512, kernel_size=5, stride=2)
-        self.conv5 = nn.Conv2d(512, 512, kernel_size=5, stride=2)
+        self.conv1 = nn.Conv2d(1, 64, kernel_size=(5,5), stride=(1,2))
+        self.conv2 = nn.Conv2d(64, 128, kernel_size=(5,5), stride=(1,2))
+        self.conv3 = nn.Conv2d(128, 256, kernel_size=(5,5), stride=(1,2))
+        self.conv4 = nn.Conv2d(256, 512, kernel_size=(5,5), stride=(1,2))
+        self.conv5 = nn.Conv2d(512, 512, kernel_size=(5,5), stride=(1,2))
         self.conv6 = nn.Conv2d(512, 32, kernel_size=1)
-        self.conv7 = nn.Conv2d(32, 1, kernel_size=(17, 2))
+        self.conv7 = nn.Conv2d(32, 1, kernel_size=(26, 4))
         #self.conv_classify = nn.Conv2d(512, n_class, kernel_size=(17, 4))
-        self.conv_classify = nn.Conv2d(32, n_class, kernel_size=(17, 2))
+        self.conv_classify = nn.Conv2d(32, n_class, kernel_size=(26, 4))
         self.drop1 = nn.Dropout2d(p=dp)
         self.drop2 = nn.Dropout2d(p=dp)
         self.drop3 = nn.Dropout2d(p=dp)
@@ -327,7 +327,7 @@ class CBHG(nn.Module):
         return out
 
 class Decoder(nn.Module):
-    def __init__(self, c_in=512, c_out=513, c_h=512, c_a=8, emb_size=128, ns=0.2):
+    def __init__(self, c_in=512, c_out=26, c_h=512, c_a=8, emb_size=128, ns=0.2):
         super(Decoder, self).__init__()
         self.ns = ns
         self.conv1 = nn.Conv1d(c_in, 2*c_h, kernel_size=3)
@@ -403,7 +403,7 @@ class Decoder(nn.Module):
         return out
 
 class Encoder(nn.Module):
-    def __init__(self, c_in=513, c_h1=128, c_h2=512, c_h3=128, ns=0.2, dp=0.5):
+    def __init__(self, c_in=26, c_h1=128, c_h2=512, c_h3=128, ns=0.2, dp=0.5):
         super(Encoder, self).__init__()
         self.ns = ns
         self.conv1s = nn.ModuleList(
@@ -488,13 +488,13 @@ if __name__ == '__main__':
     P = PatchDiscriminator().cuda()
     S = SpeakerClassifier().cuda()
     #cbhg = CBHG().cuda()
-    inp = Variable(torch.randn(16, 513, 64)).cuda()
+    inp = Variable(torch.randn(16, 26, 128)).cuda()
     e1 = E1(inp)
-    #print(e1.size())
+    print(e1.size())
     s1 = S(e1)
     c = Variable(torch.from_numpy(np.random.randint(8, size=(16)))).cuda()
     d = D(e1, c)
-    #print(d.size())
+    print(d.size())
     p1, p2 = P(d, classify=True)
     print(p1.size(), p2.size())
     #c = C(torch.cat([e1, e1],dim=1))
