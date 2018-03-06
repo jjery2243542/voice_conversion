@@ -132,24 +132,26 @@ class Sampler(object):
         self, 
         h5_path='/storage/feature/voice_conversion/vctk/en_norm_mcep_vctk.h5', 
         speaker_info_path='/storage/feature/voice_conversion/vctk/speaker-info.txt', 
-        utt_len_path='/storage/feature/voice_conversion/vctk/length.txt',
+        utt_len_path='/storage/feature/voice_conversion/vcc/mc_length.txt',
         dset='train',
         max_step=5, 
         seg_len=128,
-        n_speaker=8,
+        n_speaker=10,
     ):
         self.dset = dset
         self.f_h5 = h5py.File(h5_path, 'r')
         self.max_step = max_step
         self.seg_len = seg_len
         #self.read_sex_file(speaker_sex_path)
-        self.read_vctk_speaker_file(speaker_info_path)
+        #self.read_vctk_speaker_file(speaker_info_path)
         self.utt2len = self.read_utt_len_file(utt_len_path)
         self.speakers = list(self.f_h5[dset].keys())
-        self.n_speaker = n_speaker
-        self.speaker_used = self.female_ids[:n_speaker // 2] + self.male_ids[:n_speaker // 2]
+        #self.n_speaker = n_speaker
+        #self.speaker_used = self.female_ids[:n_speaker // 2] + self.male_ids[:n_speaker // 2]
         #self.speaker_used = ['225', '226', '227', '228', '229', '230', '232', '243']
         #self.speaker_used = self.accent['English']
+        #self.speaker_used = self.read_speakers()
+        self.speaker_used = self.speakers
         self.speaker2utts = {speaker:list(self.f_h5[f'{dset}/{speaker}'].keys()) \
                 for speaker in self.speakers}
         # remove too short utterence
@@ -167,6 +169,10 @@ class Sampler(object):
             mapping = {(speaker, utt_id): int(length) for speaker, utt_id, length in lines}
         return mapping
 
+    def read_speakers(self, path='/storage/feature/voice_conversion/vctk/en_speaker_used.txt'):
+        with open(path) as f:
+            speakers = [line.strip() for line in f]
+            return speakers
     def rm_too_short_utt(self, limit=None):
         if not limit:
             limit = self.seg_len * 2
@@ -200,7 +206,7 @@ class Sampler(object):
         # sample an utterence
         dset = self.dset
         utt_ids = random.sample(self.speaker2utts[speaker_id], n_samples)
-        lengths = [self.f_h5[f'{dset}/{speaker_id}/{utt_id}/lin'].shape[0] for utt_id in utt_ids]
+        lengths = [self.f_h5[f'{dset}/{speaker_id}/{utt_id}/norm_mc'].shape[0] for utt_id in utt_ids]
         return [(utt_id, length) for utt_id, length in zip(utt_ids, lengths)]
 
     def rand(self, l):
@@ -308,7 +314,7 @@ class SingleDataset(data.Dataset):
         speaker = index.speaker
         i, t = index.i, index.t
         seg_len = self.seg_len
-        data = [speaker, self.dataset[f'{self.dset}/{i}/lin'][t:t+seg_len]]
+        data = [speaker, self.dataset[f'{self.dset}/{i}/norm_mc'][t:t+seg_len]]
         return tuple(data)
 
     def __len__(self):
