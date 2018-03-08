@@ -9,6 +9,7 @@ import pyworld as pw
 
 def wav2mcep(wav_path, sr=16000, order=25, alpha=0.41):
     x, fs = librosa.load(wav_path, sr=sr, dtype=np.float64)
+    x, _ = librosa.effects.trim(x)
     #f0, sp, ap = pw.wav2world(x, fs)
     # 2-3 Harvest with F0 refinement (using Stonemask)
     _f0_h, t_h = pw.harvest(x, fs)

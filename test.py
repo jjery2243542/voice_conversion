@@ -17,10 +17,10 @@ from preprocess.tacotron.mcep import mc2wav
 if __name__ == '__main__':
     feature = 'sp'
     hps = Hps()
-    hps.load('./hps/vcc.json')
+    hps.load('./hps/vctk.json')
     hps_tuple = hps.get_tuple()
     solver = Solver(hps_tuple, None)
-    solver.load_model('/storage/model/voice_conversion/v25/vcc_model.pkl-98000')
+    solver.load_model('/storage/model/voice_conversion/vctk/clf/128_model.pkl')
     if feature == 'mc':
         # indexer to extract data
         indexer = Indexer()
@@ -58,8 +58,8 @@ if __name__ == '__main__':
             wav_data = mc2wav(log_f0, src_f0_mean, src_f0_std, tar_f0_mean, tar_f0_std, ap, truncated_result, mc_mean, mc_std)
             write(f'output{i+1}.wav', rate=16000, data=wav_data)
     else: 
-        spec = np.loadtxt('preprocess/test_code/vcc/lin.npy')
-        spec2 = np.loadtxt('preprocess/test_code/vcc/lin2.npy')
+        spec = np.loadtxt('preprocess/test_code/lin.npy')
+        spec2 = np.loadtxt('preprocess/test_code/lin2.npy')
         spec_expand = np.expand_dims(spec, axis=0)
         spec_tensor = torch.from_numpy(spec_expand)
         spec_tensor = spec_tensor.type(torch.FloatTensor)
@@ -67,9 +67,9 @@ if __name__ == '__main__':
         spec2_tensor = torch.from_numpy(spec2_expand)
         spec2_tensor = spec2_tensor.type(torch.FloatTensor)
         c1 = Variable(torch.from_numpy(np.array([0]))).cuda()
-        c2 = Variable(torch.from_numpy(np.array([7]))).cuda()
-        c3 = Variable(torch.from_numpy(np.array([5]))).cuda()
-        c4 = Variable(torch.from_numpy(np.array([9]))).cuda()
+        c2 = Variable(torch.from_numpy(np.array([10]))).cuda()
+        c3 = Variable(torch.from_numpy(np.array([1]))).cuda()
+        c4 = Variable(torch.from_numpy(np.array([11]))).cuda()
         results = [spec, spec2]
         result = solver.test_step(spec_tensor, c1, gen=True)
         result = result.squeeze(axis=0).transpose((1, 0))

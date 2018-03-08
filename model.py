@@ -151,8 +151,10 @@ class PatchDiscriminator(nn.Module):
         out = self.conv_block(out, self.conv4, [self.ins_norm4, self.drop4])
         out = self.conv_block(out, self.conv5, [self.ins_norm5, self.drop5])
         out = self.conv_block(out, self.conv6, [self.ins_norm6, self.drop6])
+        print(out.size())
         # GAN output value
         val = self.conv7(out)
+
         val = val.view(val.size(0), -1)
         mean_val = torch.mean(val, dim=1)
         if classify:

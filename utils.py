@@ -150,8 +150,8 @@ class Sampler(object):
         #self.speaker_used = self.female_ids[:n_speaker // 2] + self.male_ids[:n_speaker // 2]
         #self.speaker_used = ['225', '226', '227', '228', '229', '230', '232', '243']
         #self.speaker_used = self.accent['English']
-        #self.speaker_used = self.read_speakers()
-        self.speaker_used = self.speakers
+        self.speaker_used = self.read_speakers()
+        #self.speaker_used = self.speakers
         self.speaker2utts = {speaker:list(self.f_h5[f'{dset}/{speaker}'].keys()) \
                 for speaker in self.speakers}
         # remove too short utterence

@@ -138,7 +138,7 @@ class Classifier(object):
                 }
                 slot_value = (iteration + 1, hps.iters) + \
                         tuple([value for value in info.values()])
-                log = 'iter:[%06d/%06d], valid_loss=%.3f, valid_acc=%.3f'
+                log = '\niter:[%06d/%06d], valid_loss=%.3f, valid_acc=%.3f'
                 print(log % slot_value)
                 for tag, value in info.items():
                     self.logger.scalar_summary(tag, value, iteration)

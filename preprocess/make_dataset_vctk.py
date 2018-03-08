@@ -37,7 +37,7 @@ if __name__ == '__main__':
                 #lin_spec = spectrogram(wav_data).astype(np.float32).T
                 #mel_spec = melspectrogram(wav_data).astype(np.float32).T
                 mel_spec, lin_spec = get_spectrograms(filename)
-                eps = 1e-10
+                eps = 1.0
                 log_mel_spec, log_lin_spec = np.log(mel_spec+eps), np.log(lin_spec+eps)
                 if i < train_size:
                     datatype = 'train'
