@@ -26,7 +26,7 @@ with h5py.File(h5_path, 'r') as f_h5:
         for speaker in speakers:
             print(f'processing speaker-{speaker}')
             for utt_id in f_h5[f'{dset}/{speaker}']:
-                dictionary[f'{dset}/{speaker}/{utt_id}/norm_mc'] = f_h5[f'{dset}/{speaker}/{utt_id}/norm_mc'][()]
+                dictionary[f'{dset}/{speaker}/{utt_id}/lin'] = f_h5[f'{dset}/{speaker}/{utt_id}/lin'][()]
 
 #with open(speaker_used_path, 'w') as f:
 #    for speaker in speakers:
