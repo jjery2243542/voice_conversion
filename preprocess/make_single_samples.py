@@ -9,8 +9,8 @@ max_step=5
 seg_len=128
 mel_band=80
 lin_band=513
-n_samples=2000000
-dset='train'
+n_samples=20000
+dset='test'
 
 if __name__ == '__main__':
     if len(sys.argv) < 3:

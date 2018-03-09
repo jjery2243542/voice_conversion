@@ -9,7 +9,7 @@ from utils import Logger
 from utils import myDataset
 from utils import Indexer
 from solver import Solver
-from preprocess.tacotron.utils import spectrogram2wav
+from preprocess.tacotron.norm_utils import spectrogram2wav
 #from preprocess.tacotron.audio import inv_spectrogram, save_wav
 from scipy.io.wavfile import write
 from preprocess.tacotron.mcep import mc2wav
@@ -20,7 +20,8 @@ import pysptk
 import pyworld as pw
 
 def sp2wav(sp): 
-    exp_sp = (np.exp(sp) - 1)
+    #exp_sp = (np.exp(sp) - 1)
+    exp_sp = sp
     wav_data = spectrogram2wav(exp_sp)
     return wav_data
 
@@ -78,7 +79,7 @@ def get_model(hps_path='./hps/vcc.json', model_path='/storage/model/voice_conver
     solver.load_model(model_path)
     return solver
 
-def convert_all_sp(h5_path, src_speaker, tar_speaker, gen=True, 
+def convert_all_sp(h5_path, src_speaker, tar_speaker, gen=False, 
         dset='test', speaker_used_path='/storage/feature/voice_conversion/vctk/en_speaker_used.txt',
         root_dir='/storage/result/voice_conversion/vctk/p226_to_p225/'):
     # read speaker id file
@@ -86,12 +87,12 @@ def convert_all_sp(h5_path, src_speaker, tar_speaker, gen=True,
         speakers = [line.strip() for line in f]
         speaker2id = {speaker:i for i, speaker in enumerate(speakers)}
     solver = get_model(hps_path='hps/vctk.json', 
-            model_path='/storage/model/voice_conversion/vctk/clf/add_one/model.pkl-96000')
+            model_path='/storage/model/voice_conversion/vctk/ae/norm/model.pkl-41000')
     with h5py.File(h5_path, 'r') as f_h5:
         for utt_id in f_h5[f'{dset}/{src_speaker}']:
             sp = f_h5[f'{dset}/{src_speaker}/{utt_id}/lin'][()]
-            #converted_sp = convert_sp(sp, speaker2id[tar_speaker], solver, gen=gen)
-            converted_sp = sp
+            converted_sp = convert_sp(sp, speaker2id[tar_speaker], solver, gen=gen)
+            #converted_sp = sp
             wav_data = sp2wav(converted_sp)
             wav_path = os.path.join(root_dir, f'{src_speaker}_{utt_id}.wav')
             sf.write(wav_path, wav_data, 16000, 'PCM_24')
@@ -113,7 +114,7 @@ def convert_all_mc(h5_path, src_speaker, tar_speaker, gen=False,
             sf.write(wav_path, wav_data, 16000, 'PCM_24')
 
 if __name__ == '__main__':
-    h5_path = '/storage/feature/voice_conversion/vctk/trim_log_add_one_vctk.h5'
+    h5_path = '/storage/feature/voice_conversion/vctk/norm_vctk.h5'
     #convert_all_mc(h5_path, '226', '225', root_dir='./test_mc/')
     convert_all_sp(h5_path, '225', '225', root_dir='./test_sp/')
     #convert_all(h5_path, '226', '227', root_dir='/storage/result/voice_conversion/vctk/ae/p226_to_p225/')
