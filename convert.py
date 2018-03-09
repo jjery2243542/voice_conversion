@@ -31,6 +31,7 @@ def get_world_param(f_h5, src_speaker, utt_id, tar_speaker, tar_speaker_id, solv
     mc_mean = f_h5[f'train/{tar_speaker}'].attrs['mc_mean']
     mc_std = f_h5[f'train/{tar_speaker}'].attrs['mc_std']
     converted_mc = converted_mc * mc_std + mc_mean
+    #np.savetxt(f'mc_npy_tar/{tar_speaker}_{utt_id}.npy', converted_mc)
     log_f0 = f_h5[f'{dset}/{src_speaker}/{utt_id}/log_f0'][()]
     src_mean = f_h5[f'train/{src_speaker}'].attrs['f0_mean']
     src_std = f_h5[f'train/{src_speaker}'].attrs['f0_std']
@@ -95,25 +96,28 @@ def convert_all_sp(h5_path, src_speaker, tar_speaker, gen=False,
             wav_path = os.path.join(root_dir, f'p{src_speaker}_{utt_id}.wav')
             sf.write(wav_path, wav_data, 16000, 'PCM_24')
 
-def convert_all_mc(h5_path, src_speaker, tar_speaker, gen=True, 
-        dset='test', speaker_used_path='/storage/feature/voice_conversion/vctk/mcep/en_speaker_used.txt',
+def convert_all_mc(h5_path, src_speaker, tar_speaker, gen=False, 
+        dset='test', speaker_used_path='/storage/feature/voice_conversion/vcc/mcep/speaker_used.txt',
         root_dir='/storage/result/voice_conversion/vctk/p226_to_p225/'):
     # read speaker id file
     with open(speaker_used_path) as f:
         speakers = [line.strip() for line in f]
         speaker2id = {speaker:i for i, speaker in enumerate(speakers)}
-    solver = get_model(hps_path='hps/vctk.json', 
-            model_path='/storage/model/voice_conversion/vctk/mcep/model.pkl-121000')
+    solver = get_model(hps_path='hps/vcc.json', 
+            model_path='/storage/model/voice_conversion/vcc/mcep/128/model.pkl-129999')
     with h5py.File(h5_path, 'r') as f_h5:
         for utt_id in f_h5[f'{dset}/{src_speaker}']:
             f0, sp, ap = get_world_param(f_h5, src_speaker, utt_id, tar_speaker, tar_speaker_id=speaker2id[tar_speaker], solver=solver, dset='test', gen=gen)
             wav_data = synthesis(f0, sp, ap)
-            wav_path = os.path.join(root_dir, f'{src_speaker}_{utt_id}.wav')
+            wav_path = os.path.join(root_dir, f'{src_speaker}_{tar_speaker}_{utt_id}.wav')
             sf.write(wav_path, wav_data, 16000, 'PCM_24')
 
 if __name__ == '__main__':
-    h5_path = '/storage/feature/voice_conversion/vctk/trim_log_vctk.h5'
-    convert_all_mc(h5_path, '226', '225', root_dir='./test_mc/')
+    h5_path = '/storage/feature/voice_conversion/vcc/mcep/trim_mc_backup.h5'
+    convert_all_mc(h5_path, 'SF1', 'TF2', root_dir='./test_mc/wo_gen/SF1_TF2/')
+    convert_all_mc(h5_path, 'SF1', 'TM3', root_dir='./test_mc/wo_gen/SF1_TM3/')
+    convert_all_mc(h5_path, 'SM1', 'TF2', root_dir='./test_mc/wo_gen/SM1_TF2/')
+    convert_all_mc(h5_path, 'SM1', 'TM3', root_dir='./test_mc/wo_gen/SM1_TM3/')
     #convert_all(h5_path, '225', '228', root_dir='/storage/result/voice_conversion/vctk/ae/p225_to_p226/')
     #convert_all(h5_path, '226', '227', root_dir='/storage/result/voice_conversion/vctk/ae/p226_to_p225/')
     #convert_all(h5_path, '225', '228', root_dir='/storage/result/voice_conversion/vctk/ae/p225_to_p228/')
