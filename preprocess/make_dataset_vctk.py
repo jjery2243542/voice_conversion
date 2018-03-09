@@ -6,7 +6,7 @@ import glob
 import re
 from collections import defaultdict
 #from tacotron.audio import load_wav, spectrogram, melspectrogram
-from tacotron.utils import get_spectrograms 
+from tacotron.norm_utils import get_spectrograms 
 
 root_dir='/storage/datasets/VCTK/VCTK-Corpus/wav48'
 train_split=0.9
@@ -37,13 +37,13 @@ if __name__ == '__main__':
                 #lin_spec = spectrogram(wav_data).astype(np.float32).T
                 #mel_spec = melspectrogram(wav_data).astype(np.float32).T
                 mel_spec, lin_spec = get_spectrograms(filename)
-                eps = 1e-10
-                log_mel_spec, log_lin_spec = np.log(mel_spec+eps), np.log(lin_spec+eps)
+                #eps = 1e-10
+                #log_mel_spec, log_lin_spec = np.log(mel_spec+eps), np.log(lin_spec+eps)
                 if i < train_size:
                     datatype = 'train'
                 else:
                     datatype = 'test'
                 f_h5.create_dataset(f'{datatype}/{speaker_id}/{utt_id}/mel', \
-                    data=log_mel_spec, dtype=np.float32)
+                    data=mel_spec, dtype=np.float32)
                 f_h5.create_dataset(f'{datatype}/{speaker_id}/{utt_id}/lin', \
-                    data=log_lin_spec, dtype=np.float32)
+                    data=lin_spec, dtype=np.float32)

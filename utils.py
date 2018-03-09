@@ -147,7 +147,9 @@ class Sampler(object):
         self.utt2len = self.read_utt_len_file(utt_len_path)
         self.speakers = list(self.f_h5[dset].keys())
         self.n_speaker = n_speaker
-        self.speaker_used = self.female_ids[:n_speaker // 2] + self.male_ids[:n_speaker // 2]
+        self.speaker_used = self.read_speakers()
+        print(self.speaker_used)
+        #self.speaker_used = self.female_ids[:n_speaker // 2] + self.male_ids[:n_speaker // 2]
         #self.speaker_used = ['225', '226', '227', '228', '229', '230', '232', '243']
         #self.speaker_used = self.accent['English']
         self.speaker2utts = {speaker:list(self.f_h5[f'{dset}/{speaker}'].keys()) \
@@ -186,7 +188,12 @@ class Sampler(object):
                 else:
                     self.male_ids.append(info[0])
                 self.accent[info[3]].append(info[0])
-            
+
+    def read_speakers(self, path='/storage/feature/voice_conversion/vctk/en_speaker_used.txt'):
+        with open(path) as f:
+            speakers = [line.strip() for line in f]
+            return speakers     
+
     def read_libre_sex_file(self, speaker_sex_path):
         with open(speaker_sex_path, 'r') as f:
             # Female
