@@ -15,8 +15,8 @@ def read_speaker(speaker_file='/storage/datasets/VCTK/VCTK-Corpus/speaker-info.t
         m_en_ids = [line.strip().split()[0] for line in lines if line.strip().split()[3] == 'English' and line.strip().split()[2] == 'M'][:10]
         return f_en_ids + m_en_ids
 
-h5_path='/storage/feature/voice_conversion/vctk/trim_log_add_one_vctk.h5'
-pkl_path = '/storage/feature/voice_conversion/vctk/trim_log_add_one_vctk.pkl'
+h5_path='/storage/feature/voice_conversion/vctk/norm_vctk.h5'
+pkl_path = '/storage/feature/voice_conversion/vctk/norm_vctk.pkl'
 speaker_used_path = '/storage/feature/voice_conversion/vctk/en_speaker_used.txt'
 speakers = read_speaker()
 dictionary = {}
