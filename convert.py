@@ -9,7 +9,7 @@ from utils import Logger
 from utils import myDataset
 from utils import Indexer
 from solver import Solver
-from preprocess.tacotron.norm_utils import spectrogram2wav
+from preprocess.tacotron.utils import spectrogram2wav
 #from preprocess.tacotron.audio import inv_spectrogram, save_wav
 from scipy.io.wavfile import write
 from preprocess.tacotron.mcep import mc2wav
@@ -21,7 +21,8 @@ import pyworld as pw
 
 def sp2wav(sp): 
     #exp_sp = (np.exp(sp) - 1)
-    exp_sp = sp
+    #exp_sp = sp
+    exp_sp = np.exp(sp) ** 1.2
     wav_data = spectrogram2wav(exp_sp)
     return wav_data
 
@@ -81,13 +82,14 @@ def get_model(hps_path='./hps/vcc.json', model_path='/storage/model/voice_conver
 
 def convert_all_sp(h5_path, src_speaker, tar_speaker, gen=False, 
         dset='test', speaker_used_path='/storage/feature/voice_conversion/vctk/en_speaker_used.txt',
-        root_dir='/storage/result/voice_conversion/vctk/p226_to_p225/'):
+        root_dir='/storage/result/voice_conversion/vctk/p226_to_p225/',
+        model_path='/storage/model/voice_conversion/vctk/clf/wo_tanh/model_0.001.pkl-79999'):
     # read speaker id file
     with open(speaker_used_path) as f:
         speakers = [line.strip() for line in f]
         speaker2id = {speaker:i for i, speaker in enumerate(speakers)}
     solver = get_model(hps_path='hps/vctk.json', 
-            model_path='/storage/model/voice_conversion/vctk/ae/norm/model.pkl-41000')
+            model_path=model_path)
     with h5py.File(h5_path, 'r') as f_h5:
         for utt_id in f_h5[f'{dset}/{src_speaker}']:
             sp = f_h5[f'{dset}/{src_speaker}/{utt_id}/lin'][()]
@@ -99,13 +101,14 @@ def convert_all_sp(h5_path, src_speaker, tar_speaker, gen=False,
 
 def convert_all_mc(h5_path, src_speaker, tar_speaker, gen=False, 
         dset='test', speaker_used_path='/storage/feature/voice_conversion/vctk/mcep/en_speaker_used.txt',
-        root_dir='/storage/result/voice_conversion/vctk/p226_to_p225'):
+        root_dir='/storage/result/voice_conversion/vctk/p226_to_p225',
+        model_path='/storage/model/voice_conversion/vctk/clf/wo_tanh/model_0.001.pkl-79999'):
     # read speaker id file
     with open(speaker_used_path) as f:
         speakers = [line.strip() for line in f]
         speaker2id = {speaker:i for i, speaker in enumerate(speakers)}
     solver = get_model(hps_path='hps/vctk.json', 
-            model_path='/storage/model/voice_conversion/vctk/mcep/model.pkl-121000')
+            model_path=model_path)
     with h5py.File(h5_path, 'r') as f_h5:
         for utt_id in f_h5[f'{dset}/{src_speaker}']:
             f0, sp, ap = get_world_param(f_h5, src_speaker, utt_id, tar_speaker, tar_speaker_id=speaker2id[tar_speaker], solver=solver, dset='test', gen=gen)
@@ -114,9 +117,16 @@ def convert_all_mc(h5_path, src_speaker, tar_speaker, gen=False,
             sf.write(wav_path, wav_data, 16000, 'PCM_24')
 
 if __name__ == '__main__':
-    h5_path = '/storage/feature/voice_conversion/vctk/norm_vctk.h5'
-    #convert_all_mc(h5_path, '226', '225', root_dir='./test_mc/')
-    convert_all_sp(h5_path, '225', '225', root_dir='./test_sp/')
+    #h5_path = '/storage/feature/voice_conversion/vctk/trim_log_vctk.h5'
+    h5_path = '/storage/feature/voice_conversion/vctk/mcep/trim_mc_vctk_backup.h5'
+    convert_all_mc(h5_path, '226', '225', root_dir='./test_mc/', gen=True, 
+            model_path='/storage/model/voice_conversion/vctk/mcep/clf/model.pkl-129999')
+    #convert_all_sp(h5_path, '226', '228', root_dir='./test_sp/', gen=True, 
+    #        model_path='/storage/model/voice_conversion/vctk/clf/128_model.pkl')
+    #convert_all_sp(h5_path, '225', '226', root_dir='/storage/result/voice_conversion/vctk/norm/clf/p225_p226')
+    #convert_all_sp(h5_path, '225', '228', root_dir='/storage/result/voice_conversion/vctk/norm/clf/p225_p228')
+    #convert_all_sp(h5_path, '226', '225', root_dir='/storage/result/voice_conversion/vctk/norm/clf/p226_p225')
+    #convert_all_sp(h5_path, '226', '227', root_dir='/storage/result/voice_conversion/vctk/norm/clf/p226_p227')
     #convert_all(h5_path, '226', '227', root_dir='/storage/result/voice_conversion/vctk/ae/p226_to_p225/')
     #convert_all(h5_path, '225', '228', root_dir='/storage/result/voice_conversion/vctk/ae/p225_to_p228/')
     #convert_all(h5_path, '226', '227', root_dir='/storage/result/voice_conversion/vctk/ae/p226_to_p227/')

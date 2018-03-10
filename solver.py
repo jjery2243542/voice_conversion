@@ -169,8 +169,9 @@ class Solver(object):
                 slot_value = (iteration + 1, hps.enc_pretrain_iters) + tuple([value for value in info.values()])
                 log = 'pre_G:[%06d/%06d], loss_rec=%.2f'
                 print(log % slot_value)
-                for tag, value in info.items():
-                    self.logger.scalar_summary(tag, value, iteration + 1)
+                if iteration % 100 == 0:
+                    for tag, value in info.items():
+                        self.logger.scalar_summary(tag, value, iteration + 1)
         elif mode == 'pretrain_D':
             for iteration in range(hps.dis_pretrain_iters):
                 data = next(self.data_loader)
@@ -194,8 +195,9 @@ class Solver(object):
                 slot_value = (iteration + 1, hps.dis_pretrain_iters) + tuple([value for value in info.values()])
                 log = 'pre_D:[%06d/%06d], loss_clf=%.2f, acc=%.2f'
                 print(log % slot_value)
-                for tag, value in info.items():
-                    self.logger.scalar_summary(tag, value, iteration + 1)
+                if iteration % 100 == 0:
+                    for tag, value in info.items():
+                        self.logger.scalar_summary(tag, value, iteration + 1)
         elif mode == 'patchGAN':
             for iteration in range(hps.patch_iters):
                 #=======train D=========#
@@ -228,8 +230,9 @@ class Solver(object):
                     slot_value = (step, iteration+1, hps.patch_iters) + tuple([value for value in info.values()])
                     log = 'patch_D-%d:[%06d/%06d], w_dis=%.2f, gp=%.2f, loss_clf=%.2f, acc=%.2f'
                     print(log % slot_value)
-                    for tag, value in info.items():
-                        self.logger.scalar_summary(tag, value, iteration + 1)
+                    if iteration % 100 == 0:
+                        for tag, value in info.items():
+                            self.logger.scalar_summary(tag, value, iteration + 1)
                 #=======train G=========#
                 data = next(self.data_loader)
                 c, x = self.permute_data(data)
@@ -258,8 +261,9 @@ class Solver(object):
                 slot_value = (iteration+1, hps.patch_iters) + tuple([value for value in info.values()])
                 log = 'patch_G:[%06d/%06d], loss_adv=%.2f, loss_clf=%.2f, acc=%.2f'
                 print(log % slot_value)
-                for tag, value in info.items():
-                    self.logger.scalar_summary(tag, value, iteration + 1)
+                if iteration % 100 == 0:
+                    for tag, value in info.items():
+                        self.logger.scalar_summary(tag, value, iteration + 1)
                 if iteration % 1000 == 0 or iteration + 1 == hps.patch_iters:
                     self.save_model(model_path, iteration + hps.iters)
         elif mode == 'train':
@@ -293,8 +297,9 @@ class Solver(object):
                     slot_value = (step, iteration + 1, hps.iters) + tuple([value for value in info.values()])
                     log = 'D-%d:[%06d/%06d], loss_clf=%.2f, acc=%.2f'
                     print(log % slot_value)
-                    for tag, value in info.items():
-                        self.logger.scalar_summary(tag, value, iteration + 1)
+                    if iteration % 100 == 0:
+                        for tag, value in info.items():
+                            self.logger.scalar_summary(tag, value, iteration + 1)
                 #==================train G==================#
                 data = next(self.data_loader)
                 c, x = self.permute_data(data)
@@ -322,8 +327,9 @@ class Solver(object):
                 slot_value = (iteration + 1, hps.iters) + tuple([value for value in info.values()])
                 log = 'G:[%06d/%06d], loss_rec=%.2f, loss_clf=%.2f, alpha=%.2e, acc=%.2f'
                 print(log % slot_value)
-                for tag, value in info.items():
-                    self.logger.scalar_summary(tag, value, iteration + 1)
+                if iteration % 100 == 0:
+                    for tag, value in info.items():
+                        self.logger.scalar_summary(tag, value, iteration + 1)
                 if iteration % 1000 == 0 or iteration + 1 == hps.iters:
                     self.save_model(model_path, iteration)
 
