@@ -9,7 +9,7 @@ from utils import Logger
 from utils import myDataset
 from utils import Indexer
 from solver import Solver
-from preprocess.tacotron.utils import spectrogram2wav
+from preprocess.tacotron.norm_utils import spectrogram2wav
 #from preprocess.tacotron.audio import inv_spectrogram, save_wav
 from scipy.io.wavfile import write
 from preprocess.tacotron.mcep import mc2wav
@@ -20,9 +20,8 @@ import pysptk
 import pyworld as pw
 
 def sp2wav(sp): 
-    #exp_sp = (np.exp(sp) - 1)
-    #exp_sp = sp
-    exp_sp = np.exp(sp) ** 1.2
+    #exp_sp = np.exp(sp)
+    exp_sp = sp
     wav_data = spectrogram2wav(exp_sp)
     return wav_data
 
@@ -113,25 +112,44 @@ def convert_all_mc(h5_path, src_speaker, tar_speaker, gen=False,
         for utt_id in f_h5[f'{dset}/{src_speaker}']:
             f0, sp, ap = get_world_param(f_h5, src_speaker, utt_id, tar_speaker, tar_speaker_id=speaker2id[tar_speaker], solver=solver, dset='test', gen=gen)
             wav_data = synthesis(f0, sp, ap)
-            wav_path = os.path.join(root_dir, f'{src_speaker}_{utt_id}.wav')
+            wav_path = os.path.join(root_dir, f'{src_speaker}_{tar_speaker}_{utt_id}.wav')
             sf.write(wav_path, wav_data, 16000, 'PCM_24')
 
 if __name__ == '__main__':
+    h5_path = '/storage/feature/voice_conversion/vctk/norm_vctk.h5'
+    root_dir = '/storage/result/voice_conversion/vctk/norm/out_domain/'
     #h5_path = '/storage/feature/voice_conversion/vctk/trim_log_vctk.h5'
-    h5_path = '/storage/feature/voice_conversion/vctk/mcep/trim_mc_vctk_backup.h5'
-    convert_all_mc(h5_path, '226', '225', root_dir='./test_mc/', gen=True, 
-            model_path='/storage/model/voice_conversion/vctk/mcep/clf/model.pkl-129999')
-    #convert_all_sp(h5_path, '226', '228', root_dir='./test_sp/', gen=True, 
-    #        model_path='/storage/model/voice_conversion/vctk/clf/128_model.pkl')
-    #convert_all_sp(h5_path, '225', '226', root_dir='/storage/result/voice_conversion/vctk/norm/clf/p225_p226')
-    #convert_all_sp(h5_path, '225', '228', root_dir='/storage/result/voice_conversion/vctk/norm/clf/p225_p228')
-    #convert_all_sp(h5_path, '226', '225', root_dir='/storage/result/voice_conversion/vctk/norm/clf/p226_p225')
-    #convert_all_sp(h5_path, '226', '227', root_dir='/storage/result/voice_conversion/vctk/norm/clf/p226_p227')
-    #convert_all(h5_path, '226', '227', root_dir='/storage/result/voice_conversion/vctk/ae/p226_to_p225/')
-    #convert_all(h5_path, '225', '228', root_dir='/storage/result/voice_conversion/vctk/ae/p225_to_p228/')
-    #convert_all(h5_path, '226', '227', root_dir='/storage/result/voice_conversion/vctk/ae/p226_to_p227/')
-    #solver = get_model(hps_path='hps/vctk.json', model_path='/storage/model/voice_conversion/vctk/ae/128/model.pkl-79999')
-    #spec = np.loadtxt('preprocess/test_code/lin.npy')
-    #converted_spec = convert(spec, 10, solver, gen=True)
-    #wav_data = sp2wav(converted_spec)
-    #write_wav(wav_data, 'test.wav')
+    #h5_path = '/storage/feature/voice_conversion/vctk/mcep/trim_mc_vctk_backup.h5'
+    #convert_all_mc(h5_path, '226', '225', root_dir='./test_mc/', gen=False, 
+    #        model_path='/storage/model/voice_conversion/vctk/mcep/clf/model.pkl-129999')
+    #convert_all_mc(h5_path, '225', '226', root_dir='./test_mc/', gen=False, 
+    #        model_path='/storage/model/voice_conversion/vctk/mcep/clf/model.pkl-129999')
+    #convert_all_mc(h5_path, '225', '228', root_dir='./test_mc/', gen=False, 
+    #        model_path='/storage/model/voice_conversion/vctk/mcep/clf/model.pkl-129999')
+    #model_path = '/storage/model/voice_conversion/vctk/mcep/clf/model.pkl-129999'
+    model_path = '/storage/model/voice_conversion/vctk/clf/norm/wo_tanh/model_0.01.pkl-129999'
+    #model_path = '/storage/model/voice_conversion/vctk/clf/128_model.pkl'
+    #convert_all_mc(h5_path,'225','225',root_dir=os.path.join(root_dir, 'p225'), 
+    #        gen=False, model_path=model_path)
+    #convert_all_mc(h5_path,'226','226',root_dir=os.path.join(root_dir, 'p226'), 
+    #        gen=False, model_path=model_path)
+    #convert_all_mc(h5_path,'227','227',root_dir=os.path.join(root_dir, 'p227'), 
+    #        gen=False, model_path=model_path)
+    #convert_all_mc(h5_path,'228','228',root_dir=os.path.join(root_dir, 'p228'), 
+    #        gen=False, model_path=model_path)
+    #convert_all_mc(h5_path,'299','225',root_dir=os.path.join(root_dir, 'p299_p225'), 
+    #        gen=False, model_path=model_path)
+    #convert_all_mc(h5_path,'299','228',root_dir=os.path.join(root_dir, 'p299_p228'), 
+    #        gen=False, model_path=model_path)
+    #convert_all_mc(h5_path,'225','228',root_dir=os.path.join(root_dir, 'p225_p228'), 
+    #        gen=False, model_path=model_path)
+    #convert_all_mc(h5_path,'226','227',root_dir=os.path.join(root_dir, 'p226_p227'), 
+    #        gen=False, model_path=model_path)
+    convert_all_sp(h5_path,'251','225',root_dir=os.path.join(root_dir, 'p251_p225'), 
+            gen=True, model_path=model_path)
+    convert_all_sp(h5_path,'251','228',root_dir=os.path.join(root_dir, 'p251_p228'), 
+            gen=True, model_path=model_path)
+    #convert_all_sp(h5_path,'225','228',root_dir=os.path.join(root_dir, 'p225_p228'), 
+    #        gen=True, model_path=model_path)
+    #convert_all_sp(h5_path,'226','227',root_dir=os.path.join(root_dir, 'p226_p227'), 
+    #        gen=True, model_path=model_path)

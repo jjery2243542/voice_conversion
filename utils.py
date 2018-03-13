@@ -315,7 +315,7 @@ class SingleDataset(data.Dataset):
         speaker = index.speaker
         i, t = index.i, index.t
         seg_len = self.seg_len
-        data = [speaker, self.dataset[f'{self.dset}/{i}/lin'][t:t+seg_len]]
+        data = [speaker, self.dataset[f'{self.dset}/{i}/norm_mc'][t:t+seg_len]]
         return tuple(data)
 
     def __len__(self):
