@@ -93,7 +93,6 @@ def convert_all_sp(h5_path, src_speaker, tar_speaker, gen=False,
         for utt_id in f_h5[f'{dset}/{src_speaker}']:
             sp = f_h5[f'{dset}/{src_speaker}/{utt_id}/lin'][()]
             converted_sp = convert_sp(sp, speaker2id[tar_speaker], solver, gen=gen)
-            #converted_sp = sp
             wav_data = sp2wav(converted_sp)
             wav_path = os.path.join(root_dir, f'{src_speaker}_{utt_id}.wav')
             sf.write(wav_path, wav_data, 16000, 'PCM_24')
@@ -116,9 +115,9 @@ def convert_all_mc(h5_path, src_speaker, tar_speaker, gen=False,
             sf.write(wav_path, wav_data, 16000, 'PCM_24')
 
 if __name__ == '__main__':
+    #h5_path = '/storage/feature/voice_conversion/vctk/mcep/trim_mc_en_india_backup.h5'
+    root_dir = '/storage/result/voice_conversion/vctk/norm/concat/clf/'
     h5_path = '/storage/feature/voice_conversion/vctk/norm_vctk.h5'
-    root_dir = '/storage/result/voice_conversion/vctk/norm/out_domain/'
-    #h5_path = '/storage/feature/voice_conversion/vctk/trim_log_vctk.h5'
     #h5_path = '/storage/feature/voice_conversion/vctk/mcep/trim_mc_vctk_backup.h5'
     #convert_all_mc(h5_path, '226', '225', root_dir='./test_mc/', gen=False, 
     #        model_path='/storage/model/voice_conversion/vctk/mcep/clf/model.pkl-129999')
@@ -127,7 +126,8 @@ if __name__ == '__main__':
     #convert_all_mc(h5_path, '225', '228', root_dir='./test_mc/', gen=False, 
     #        model_path='/storage/model/voice_conversion/vctk/mcep/clf/model.pkl-129999')
     #model_path = '/storage/model/voice_conversion/vctk/mcep/clf/model.pkl-129999'
-    model_path = '/storage/model/voice_conversion/vctk/clf/norm/wo_tanh/model_0.01.pkl-129999'
+    #model_path = '/storage/model/voice_conversion/vctk/clf/norm/wo_tanh/model_0.01.pkl-129999'
+    model_path = '/storage/model/voice_conversion/vctk/ae/norm/model_0.01_proj.pkl-79999'
     #model_path = '/storage/model/voice_conversion/vctk/clf/128_model.pkl'
     #convert_all_mc(h5_path,'225','225',root_dir=os.path.join(root_dir, 'p225'), 
     #        gen=False, model_path=model_path)
@@ -137,19 +137,23 @@ if __name__ == '__main__':
     #        gen=False, model_path=model_path)
     #convert_all_mc(h5_path,'228','228',root_dir=os.path.join(root_dir, 'p228'), 
     #        gen=False, model_path=model_path)
-    #convert_all_mc(h5_path,'299','225',root_dir=os.path.join(root_dir, 'p299_p225'), 
-    #        gen=False, model_path=model_path)
-    #convert_all_mc(h5_path,'299','228',root_dir=os.path.join(root_dir, 'p299_p228'), 
-    #        gen=False, model_path=model_path)
+    #convert_all_mc(h5_path,'251','225',root_dir=os.path.join(root_dir, 'p251_p225'), 
+    #        gen=True, model_path=model_path)
+    #convert_all_mc(h5_path,'251','228',root_dir=os.path.join(root_dir, 'p251_p228'), 
+    #        gen=True, model_path=model_path)
     #convert_all_mc(h5_path,'225','228',root_dir=os.path.join(root_dir, 'p225_p228'), 
     #        gen=False, model_path=model_path)
     #convert_all_mc(h5_path,'226','227',root_dir=os.path.join(root_dir, 'p226_p227'), 
     #        gen=False, model_path=model_path)
-    convert_all_sp(h5_path,'251','225',root_dir=os.path.join(root_dir, 'p251_p225'), 
-            gen=True, model_path=model_path)
-    convert_all_sp(h5_path,'251','228',root_dir=os.path.join(root_dir, 'p251_p228'), 
-            gen=True, model_path=model_path)
-    #convert_all_sp(h5_path,'225','228',root_dir=os.path.join(root_dir, 'p225_p228'), 
-    #        gen=True, model_path=model_path)
+    convert_all_sp(h5_path,'225','228',root_dir=os.path.join(root_dir, 'p225_p228'), 
+            gen=False, model_path=model_path)
+    convert_all_sp(h5_path,'226','225',root_dir=os.path.join(root_dir, 'p226_p225'), 
+            gen=False, model_path=model_path)
+    #convert_all_sp(h5_path,'251','225',root_dir=os.path.join(root_dir, 'p251_p225'), 
+    #        gen=False, model_path=model_path)
+    #convert_all_sp(h5_path,'251','228',root_dir=os.path.join(root_dir, 'p251_p228'), 
+    #        gen=False, model_path=model_path)
     #convert_all_sp(h5_path,'226','227',root_dir=os.path.join(root_dir, 'p226_p227'), 
-    #        gen=True, model_path=model_path)
+    #        gen=False, model_path=model_path)
+    #convert_all_sp(h5_path,'225','226',root_dir=os.path.join(root_dir, 'p225_p226'), 
+    #        gen=False, model_path=model_path)

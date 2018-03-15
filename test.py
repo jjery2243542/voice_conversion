@@ -17,10 +17,10 @@ from preprocess.tacotron.mcep import mc2wav
 if __name__ == '__main__':
     feature = 'sp'
     hps = Hps()
-    hps.load('./hps/vcc.json')
+    hps.load('./hps/vctk.json')
     hps_tuple = hps.get_tuple()
     solver = Solver(hps_tuple, None)
-    solver.load_model('/storage/model/voice_conversion/v25/vcc_model.pkl-98000')
+    solver.load_model('/storage/model/voice_conversion/vctk/clf/128_model.pkl')
     if feature == 'mc':
         # indexer to extract data
         indexer = Indexer()
