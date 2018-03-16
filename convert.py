@@ -127,7 +127,7 @@ if __name__ == '__main__':
     #convert_all_mc(h5_path, '225', '228', root_dir='./test_mc/', gen=False, 
     #        model_path='/storage/model/voice_conversion/vctk/mcep/clf/model.pkl-129999')
     #model_path = '/storage/model/voice_conversion/vctk/mcep/clf/model.pkl-129999'
-    model_path = '/storage/model/voice_conversion/vctk/clf/norm/wo_tanh/model_0.01.pkl-129999'
+    model_path = '/storage/model/voice_conversion/vctk/clf/norm/model_0.001_new.pkl-129999'
     #model_path = '/storage/model/voice_conversion/vctk/clf/128_model.pkl'
     #convert_all_mc(h5_path,'225','225',root_dir=os.path.join(root_dir, 'p225'), 
     #        gen=False, model_path=model_path)
@@ -145,10 +145,10 @@ if __name__ == '__main__':
     #        gen=False, model_path=model_path)
     #convert_all_mc(h5_path,'226','227',root_dir=os.path.join(root_dir, 'p226_p227'), 
     #        gen=False, model_path=model_path)
-    convert_all_sp(h5_path,'251','225',root_dir=os.path.join(root_dir, 'p251_p225'), 
-            gen=True, model_path=model_path)
-    convert_all_sp(h5_path,'251','228',root_dir=os.path.join(root_dir, 'p251_p228'), 
-            gen=True, model_path=model_path)
+    convert_all_sp(h5_path,'226','225',root_dir=os.path.join(root_dir, 'p226_p225'), 
+            gen=False, model_path=model_path)
+    convert_all_sp(h5_path,'225','228',root_dir=os.path.join(root_dir, 'p225_p228'), 
+            gen=False, model_path=model_path)
     #convert_all_sp(h5_path,'225','228',root_dir=os.path.join(root_dir, 'p225_p228'), 
     #        gen=True, model_path=model_path)
     #convert_all_sp(h5_path,'226','227',root_dir=os.path.join(root_dir, 'p226_p227'), 
