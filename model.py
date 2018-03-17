@@ -120,9 +120,8 @@ class PatchDiscriminator(nn.Module):
         self.conv4 = nn.Conv2d(128, 256, kernel_size=5, stride=2)
         self.conv5 = nn.Conv2d(256, 512, kernel_size=5, stride=2)
         self.conv6 = nn.Conv2d(512, 512, kernel_size=5)
-        self.conv7 = nn.Conv2d(512, 256, kernel_size=5)
-        self.conv8 = nn.Conv2d(256, 32, kernel_size=1)
-        self.conv9 = nn.Conv2d(32, 1, kernel_size=(17, 4))
+        self.conv7 = nn.Conv2d(512, 32, kernel_size=1)
+        self.conv8 = nn.Conv2d(32, 1, kernel_size=(17, 4))
         #self.conv_classify = nn.Conv2d(512, n_class, kernel_size=(17, 4))
         self.conv_classify = nn.Conv2d(32, n_class, kernel_size=(17, 4))
         self.drop1 = nn.Dropout2d(p=dp)
@@ -132,7 +131,6 @@ class PatchDiscriminator(nn.Module):
         self.drop5 = nn.Dropout2d(p=dp)
         self.drop6 = nn.Dropout2d(p=dp)
         self.drop7 = nn.Dropout2d(p=dp)
-        self.drop8 = nn.Dropout2d(p=dp)
         self.ins_norm1 = nn.InstanceNorm2d(self.conv1.out_channels)
         self.ins_norm2 = nn.InstanceNorm2d(self.conv2.out_channels)
         self.ins_norm3 = nn.InstanceNorm2d(self.conv3.out_channels)
@@ -140,7 +138,6 @@ class PatchDiscriminator(nn.Module):
         self.ins_norm5 = nn.InstanceNorm2d(self.conv5.out_channels)
         self.ins_norm6 = nn.InstanceNorm2d(self.conv6.out_channels)
         self.ins_norm7 = nn.InstanceNorm2d(self.conv7.out_channels)
-        self.ins_norm8 = nn.InstanceNorm2d(self.conv8.out_channels)
 
     def conv_block(self, x, conv_layer, after_layers):
         out = pad_layer(x, conv_layer, is_2d=True)
@@ -158,9 +155,8 @@ class PatchDiscriminator(nn.Module):
         out = self.conv_block(out, self.conv5, [self.ins_norm5, self.drop5])
         out = self.conv_block(out, self.conv6, [self.ins_norm6, self.drop6])
         out = self.conv_block(out, self.conv7, [self.ins_norm7, self.drop7])
-        out = self.conv_block(out, self.conv8, [self.ins_norm8, self.drop8])
         # GAN output value
-        val = self.conv9(out)
+        val = self.conv8(out)
         val = val.view(val.size(0), -1)
         mean_val = torch.mean(val, dim=1)
         if classify:

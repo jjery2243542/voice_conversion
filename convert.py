@@ -116,7 +116,7 @@ def convert_all_mc(h5_path, src_speaker, tar_speaker, gen=False,
 
 if __name__ == '__main__':
     #h5_path = '/storage/feature/voice_conversion/vctk/mcep/trim_mc_en_india_backup.h5'
-    root_dir = '/storage/result/voice_conversion/vctk/norm/deep/ae/'
+    root_dir = '/storage/result/voice_conversion/vctk/norm/deep/clf/'
     h5_path = '/storage/feature/voice_conversion/vctk/norm_vctk.h5'
     #h5_path = '/storage/feature/voice_conversion/vctk/mcep/trim_mc_vctk_backup.h5'
     #convert_all_mc(h5_path, '226', '225', root_dir='./test_mc/', gen=False, 
@@ -127,7 +127,7 @@ if __name__ == '__main__':
     #        model_path='/storage/model/voice_conversion/vctk/mcep/clf/model.pkl-129999')
     #model_path = '/storage/model/voice_conversion/vctk/mcep/clf/model.pkl-129999'
     #model_path = '/storage/model/voice_conversion/vctk/clf/norm/wo_tanh/model_0.01.pkl-129999'
-    model_path = '/storage/model/voice_conversion/vctk/ae/norm/model_deep.pkl-86000'
+    model_path = '/storage/model/voice_conversion/vctk/clf/norm/model_deep_0.001.pkl-90000'
     #model_path = '/storage/model/voice_conversion/vctk/clf/128_model.pkl'
     #convert_all_mc(h5_path,'225','225',root_dir=os.path.join(root_dir, 'p225'), 
     #        gen=False, model_path=model_path)
@@ -145,6 +145,8 @@ if __name__ == '__main__':
     #        gen=False, model_path=model_path)
     #convert_all_mc(h5_path,'226','227',root_dir=os.path.join(root_dir, 'p226_p227'), 
     #        gen=False, model_path=model_path)
+    convert_all_sp(h5_path,'225','233',root_dir=os.path.join(root_dir, 'p225_p233'), 
+            gen=False, model_path=model_path)
     convert_all_sp(h5_path,'225','228',root_dir=os.path.join(root_dir, 'p225_p228'), 
             gen=False, model_path=model_path)
     convert_all_sp(h5_path,'226','225',root_dir=os.path.join(root_dir, 'p226_p225'), 
@@ -153,7 +155,9 @@ if __name__ == '__main__':
     #        gen=False, model_path=model_path)
     #convert_all_sp(h5_path,'251','228',root_dir=os.path.join(root_dir, 'p251_p228'), 
     #        gen=False, model_path=model_path)
-    #convert_all_sp(h5_path,'226','227',root_dir=os.path.join(root_dir, 'p226_p227'), 
-    #        gen=False, model_path=model_path)
-    #convert_all_sp(h5_path,'225','226',root_dir=os.path.join(root_dir, 'p225_p226'), 
-    #        gen=False, model_path=model_path)
+    convert_all_sp(h5_path,'226','227',root_dir=os.path.join(root_dir, 'p226_p227'), 
+            gen=False, model_path=model_path)
+    convert_all_sp(h5_path,'225','226',root_dir=os.path.join(root_dir, 'p225_p226'), 
+            gen=False, model_path=model_path)
+    convert_all_sp(h5_path,'225','233',root_dir=os.path.join(root_dir, 'p225_p233'), 
+            gen=False, model_path=model_path)
