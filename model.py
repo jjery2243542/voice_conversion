@@ -167,8 +167,8 @@ class WeakSpeakerClassifier(nn.Module):
     def __init__(self, c_in=512, c_h=512, n_class=8, dp=0.1, ns=0.01):
         super(WeakSpeakerClassifier, self).__init__()
         self.dp, self.ns = dp, ns
-        self.conv1 = nn.Conv1d(c_in, c_h, kernel_size=5, stride=2)
-        self.conv2 = nn.Conv1d(c_h, c_h, kernel_size=5, stride=2)
+        self.conv1 = nn.Conv1d(c_in, c_h, kernel_size=3, stride=2)
+        self.conv2 = nn.Conv1d(c_h, c_h, kernel_size=3, stride=2)
         self.conv3 = nn.Conv1d(c_h, n_class, kernel_size=4)
         self.drop1 = nn.Dropout(p=dp)
         self.drop2 = nn.Dropout(p=dp)
