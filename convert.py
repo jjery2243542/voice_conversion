@@ -127,7 +127,7 @@ if __name__ == '__main__':
     #        model_path='/storage/model/voice_conversion/vctk/mcep/clf/model.pkl-129999')
     #model_path = '/storage/model/voice_conversion/vctk/mcep/clf/model.pkl-129999'
     #model_path = '/storage/model/voice_conversion/vctk/clf/norm/wo_tanh/model_0.01.pkl-129999'
-    model_path = '/storage/model/voice_conversion/vctk/clf/norm/model_new_0.001.pkl-199999'
+    model_path = '/storage/model/voice_conversion/vctk/clf/norm/model_0.001_l2_acc.pkl-146000'
     #model_path = '/storage/model/voice_conversion/vctk/clf/128_model.pkl'
     #convert_all_mc(h5_path,'225','225',root_dir=os.path.join(root_dir, 'p225'), 
     #        gen=False, model_path=model_path)

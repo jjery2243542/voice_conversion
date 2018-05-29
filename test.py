@@ -9,18 +9,19 @@ from utils import Logger
 from utils import myDataset
 from utils import Indexer
 from solver import Solver
-from preprocess.tacotron.utils import spectrogram2wav
+from preprocess.tacotron.norm_utils import spectrogram2wav, get_spectrograms
 #from preprocess.tacotron.audio import inv_spectrogram, save_wav
 from scipy.io.wavfile import write
 from preprocess.tacotron.mcep import mc2wav
+import glob
 
 if __name__ == '__main__':
     feature = 'sp'
     hps = Hps()
-    hps.load('./hps/vcc.json')
+    hps.load('./hps/tv.json')
     hps_tuple = hps.get_tuple()
     solver = Solver(hps_tuple, None)
-    solver.load_model('/storage/model/voice_conversion/v25/vcc_model.pkl-98000')
+    solver.load_model('/storage/model/voice_conversion/tv/model_1e-3_patch.pkl-2000')
     if feature == 'mc':
         # indexer to extract data
         indexer = Indexer()
@@ -57,40 +58,52 @@ if __name__ == '__main__':
             truncated_result = result[:ap.shape[0]]
             wav_data = mc2wav(log_f0, src_f0_mean, src_f0_std, tar_f0_mean, tar_f0_std, ap, truncated_result, mc_mean, mc_std)
             write(f'output{i+1}.wav', rate=16000, data=wav_data)
-    else: 
-        spec = np.loadtxt('preprocess/test_code/vcc/lin.npy')
-        spec2 = np.loadtxt('preprocess/test_code/vcc/lin2.npy')
+    else:
+        filename = '/storage/datasets/teacher_voice/data/lin_shan_lee/wav/20060530-1-002380.wav' 
+        #spec = np.loadtxt(filename)
+        _, spec = get_spectrograms(filename)
         spec_expand = np.expand_dims(spec, axis=0)
-        spec_tensor = torch.from_numpy(spec_expand)
-        spec_tensor = spec_tensor.type(torch.FloatTensor)
-        spec2_expand = np.expand_dims(spec2, axis=0)
-        spec2_tensor = torch.from_numpy(spec2_expand)
-        spec2_tensor = spec2_tensor.type(torch.FloatTensor)
-        c1 = Variable(torch.from_numpy(np.array([0]))).cuda()
-        c2 = Variable(torch.from_numpy(np.array([7]))).cuda()
-        c3 = Variable(torch.from_numpy(np.array([5]))).cuda()
-        c4 = Variable(torch.from_numpy(np.array([9]))).cuda()
-        results = [spec, spec2]
-        result = solver.test_step(spec_tensor, c1, gen=True)
+        spec_tensor = torch.from_numpy(spec_expand).type(torch.FloatTensor)
+        c = Variable(torch.from_numpy(np.array([1]))).cuda()
+        result = solver.test_step(spec_tensor, c, gen=True)
         result = result.squeeze(axis=0).transpose((1, 0))
-        result = np.concatenate([result, np.ones((100, 513), dtype=np.float32) * -10])
-        results.append(result)
-        result = solver.test_step(spec2_tensor, c2, gen=True)
-        result = result.squeeze(axis=0).transpose((1, 0))
-        results.append(result)
-        result = solver.test_step(spec2_tensor, c1, gen=True)
-        result = result.squeeze(axis=0).transpose((1, 0))
-        results.append(result)
-        result = solver.test_step(spec_tensor, c2, gen=True)
-        result = result.squeeze(axis=0).transpose((1, 0))
-        results.append(result)
-        result = solver.test_step(spec_tensor, c3, gen=True)
-        result = result.squeeze(axis=0).transpose((1, 0))
-        results.append(result)
-        result = solver.test_step(spec_tensor, c4, gen=True)
-        result = result.squeeze(axis=0).transpose((1, 0))
-        results.append(result)
-        for i, result in enumerate(results):
-            result = np.power(np.e, result)**1.2
-            wav_data = spectrogram2wav(result)
-            write(f'output{i+1}.wav', rate=16000, data=wav_data)
+        print(result.shape)
+        wav_data = spectrogram2wav(result)
+        write('result.wav', rate=16000, data=wav_data)
+        #result = solver.test_step(spec_tensor, c1, gen=True)
+        #spec = np.loadtxt('preprocess/test_code/vcc/lin.npy')
+        #spec2 = np.loadtxt('preprocess/test_code/vcc/lin2.npy')
+        #spec_expand = np.expand_dims(spec, axis=0)
+        #spec_tensor = torch.from_numpy(spec_expand)
+        #spec_tensor = spec_tensor.type(torch.FloatTensor)
+        #spec2_expand = np.expand_dims(spec2, axis=0)
+        #spec2_tensor = torch.from_numpy(spec2_expand)
+        #spec2_tensor = spec2_tensor.type(torch.FloatTensor)
+        #c1 = Variable(torch.from_numpy(np.array([0]))).cuda()
+        #c2 = Variable(torch.from_numpy(np.array([7]))).cuda()
+        #c3 = Variable(torch.from_numpy(np.array([5]))).cuda()
+        #c4 = Variable(torch.from_numpy(np.array([9]))).cuda()
+        #results = [spec, spec2]
+        #result = solver.test_step(spec_tensor, c1, gen=True)
+        #result = result.squeeze(axis=0).transpose((1, 0))
+        #result = np.concatenate([result, np.ones((100, 513), dtype=np.float32) * -10])
+        #results.append(result)
+        #result = solver.test_step(spec2_tensor, c2, gen=True)
+        #result = result.squeeze(axis=0).transpose((1, 0))
+        #results.append(result)
+        #result = solver.test_step(spec2_tensor, c1, gen=True)
+        #result = result.squeeze(axis=0).transpose((1, 0))
+        #results.append(result)
+        #result = solver.test_step(spec_tensor, c2, gen=True)
+        #result = result.squeeze(axis=0).transpose((1, 0))
+        #results.append(result)
+        #result = solver.test_step(spec_tensor, c3, gen=True)
+        #result = result.squeeze(axis=0).transpose((1, 0))
+        #results.append(result)
+        #result = solver.test_step(spec_tensor, c4, gen=True)
+        #result = result.squeeze(axis=0).transpose((1, 0))
+        #results.append(result)
+        #for i, result in enumerate(results):
+        #    result = np.power(np.e, result)**1.2
+        #    wav_data = spectrogram2wav(result)
+        #    write(f'output{i+1}.wav', rate=16000, data=wav_data)

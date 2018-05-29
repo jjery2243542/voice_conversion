@@ -20,6 +20,11 @@ def cc(net):
     else:
         return net
 
+def gen_noise(x_dim, y_dim):
+    x = torch.randn(x_dim, 1) 
+    y = torch.randn(1, y_dim)
+    return x @ y
+
 def cal_mean_grad(net):
     grad = Variable(torch.FloatTensor([0])).cuda()
     for i, p in enumerate(net.parameters()):
@@ -41,7 +46,7 @@ def reset_grad(net_list):
 
 def grad_clip(net_list, max_grad_norm):
     for net in net_list:
-        torch.nn.utils.clip_grad_norm(net.parameters(), max_grad_norm)
+        torch.nn.utils.clip_grad_norm_(net.parameters(), max_grad_norm)
 
 def calculate_gradients_penalty(netD, real_data, fake_data):
     alpha = torch.rand(real_data.size(0))
@@ -143,11 +148,13 @@ class Sampler(object):
         self.max_step = max_step
         self.seg_len = seg_len
         #self.read_sex_file(speaker_sex_path)
-        self.read_vctk_speaker_file(speaker_info_path)
-        self.utt2len = self.read_utt_len_file(utt_len_path)
+        #self.read_vctk_speaker_file(speaker_info_path)
+        #self.utt2len = self.read_utt_len_file(utt_len_path)
+        self.utt2len = self.get_utt_len()
         self.speakers = list(self.f_h5[dset].keys())
         self.n_speaker = n_speaker
-        self.speaker_used = self.read_speakers()
+        #self.speaker_used = self.read_speakers()
+        self.speaker_used = self.speakers
         print(self.speaker_used)
         #self.speaker_used = self.female_ids[:n_speaker // 2] + self.male_ids[:n_speaker // 2]
         #self.speaker_used = ['225', '226', '227', '228', '229', '230', '232', '243']
@@ -168,6 +175,17 @@ class Sampler(object):
             lines = [tuple(line.strip().split()) for line in f.readlines()]
             mapping = {(speaker, utt_id): int(length) for speaker, utt_id, length in lines}
         return mapping
+
+    def get_utt_len(self):
+        mapping = {}
+        for dset in ['train', 'test']:
+            for speaker in self.f_h5[f'{dset}']:
+                for utt_id in self.f_h5[f'{dset}/{speaker}']:
+                    length = self.f_h5[f'{dset}/{speaker}/{utt_id}/lin'][()].shape[0]
+                    mapping[(speaker, utt_id)] = length
+        return mapping
+
+
 
     def rm_too_short_utt(self, limit=None):
         if not limit:
