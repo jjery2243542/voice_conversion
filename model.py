@@ -359,12 +359,12 @@ class Decoder(nn.Module):
         # first layer
         x_add = x + emb.view(emb.size(0), emb.size(1), 1)
         out = pad_layer(x_add, conv_layers[0])
-        out = F.relu(out, negative_slope=self.ns)
+        out = F.relu(out)
         # upsample by pixelshuffle
         out = pixel_shuffle_1d(out, upscale_factor=2)
         out = out + emb.view(emb.size(0), emb.size(1), 1)
         out = pad_layer(out, conv_layers[1])
-        out = F.relu(out, negative_slope=self.ns)
+        out = F.relu(out)
         out = norm_layer(out)
         if res:
             x_up = upsample(x, scale_factor=2)
@@ -376,7 +376,7 @@ class Decoder(nn.Module):
         for layer in layers:
             out = out + emb.view(emb.size(0), emb.size(1), 1)
             out = linear(out, layer)
-            out = F.relu(out, negative_slope=self.ns)
+            out = F.relu(out)
         out = norm_layer(out)
         if res:
             out = out + x
@@ -397,7 +397,7 @@ class Decoder(nn.Module):
         out = torch.cat([out, out_rnn], dim=1)
         out = append_emb(self.emb5(c), out.size(2), out)
         out = linear(out, self.dense5)
-        out = F.relu(out, negative_slope=self.ns)
+        out = F.relu(out)
         out = linear(out, self.linear)
         #out = torch.tanh(out)
         return out
@@ -441,7 +441,7 @@ class Encoder(nn.Module):
         out = x
         for layer in conv_layers:
             out = pad_layer(out, layer)
-            out = F.relu(out, negative_slope=self.ns)
+            out = F.relu(out)
         for layer in norm_layers:
             out = layer(out)
         if res:
@@ -454,7 +454,7 @@ class Encoder(nn.Module):
         out = x
         for layer in layers:
             out = linear(out, layer)
-            out = F.relu(out, negative_slope=self.ns)
+            out = F.relu(out)
         for layer in norm_layers:
             out = layer(out)
         if res:
@@ -467,7 +467,7 @@ class Encoder(nn.Module):
             out = pad_layer(x, l)
             outs.append(out)
         out = torch.cat(outs + [x], dim=1)
-        out = F.relu(out, negative_slope=self.ns)
+        out = F.relu(out)
         out = self.conv_block(out, [self.conv2], [self.ins_norm1, self.drop1], res=False)
         out = self.conv_block(out, [self.conv3, self.conv4], [self.ins_norm2, self.drop2])
         out = self.conv_block(out, [self.conv5, self.conv6], [self.ins_norm3, self.drop3])
@@ -478,7 +478,7 @@ class Encoder(nn.Module):
         out_rnn = RNN(out, self.RNN)
         out = torch.cat([out, out_rnn], dim=1)
         out = linear(out, self.linear)
-        out = F.relu(out, negative_slope=self.ns)
+        out = F.relu(out)
         return out
 
 if __name__ == '__main__':
