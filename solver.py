@@ -24,6 +24,7 @@ from utils import grad_clip
 from utils import cal_acc
 from utils import cc
 from utils import calculate_gradients_penalty
+from utils import gen_noise
 #from preprocess.tacotron import utils
 
 class Solver(object):
@@ -42,8 +43,8 @@ class Solver(object):
         self.Encoder = cc(Encoder(ns=ns, dp=hps.enc_dp))
         self.Decoder = cc(Decoder(ns=ns, c_a=hps.n_speakers, emb_size=emb_size))
         self.Generator = cc(Decoder(ns=ns, c_a=hps.n_speakers, emb_size=emb_size))
-        self.SpeakerClassifier = cc(WeakSpeakerClassifier(ns=ns, n_class=hps.n_speakers, dp=hps.dis_dp))
-        self.PatchDiscriminator = cc(PatchDiscriminator(ns=ns, n_class=hps.n_speakers))
+        self.SpeakerClassifier = cc(SpeakerClassifier(ns=ns, n_class=hps.n_speakers, dp=hps.dis_dp))
+        self.PatchDiscriminator = cc(nn.DataParallel(PatchDiscriminator(ns=ns, n_class=hps.n_speakers)))
         betas = (0.5, 0.9)
         params = list(self.Encoder.parameters()) + list(self.Decoder.parameters())
         self.ae_opt = optim.Adam(params, lr=self.hps.lr, betas=betas)
@@ -154,20 +155,22 @@ class Solver(object):
             for iteration in range(hps.enc_pretrain_iters):
                 data = next(self.data_loader)
                 c, x = self.permute_data(data)
+                noise = to_var(cc(gen_noise(x.size(1), x.size(2))), requires_grad=False)
+                x_n = x + noise 
                 # encode
-                enc = self.encode_step(x)
+                enc = self.encode_step(x_n)
                 x_tilde = self.decode_step(enc, c)
-                loss_rec = torch.mean(torch.abs(x_tilde - x))
+                loss_rec = torch.mean((x_tilde - x)**2)
                 reset_grad([self.Encoder, self.Decoder])
                 loss_rec.backward()
                 grad_clip([self.Encoder, self.Decoder], self.hps.max_grad_norm)
                 self.ae_opt.step()
                 # tb info
                 info = {
-                    f'{flag}/pre_loss_rec': loss_rec.data[0],
+                    f'{flag}/pre_loss_rec': loss_rec.item(),
                 }
                 slot_value = (iteration + 1, hps.enc_pretrain_iters) + tuple([value for value in info.values()])
-                log = 'pre_G:[%06d/%06d], loss_rec=%.2f'
+                log = 'pre_G:[%06d/%06d], loss_rec=%.3f'
                 print(log % slot_value)
                 if iteration % 100 == 0:
                     for tag, value in info.items():
@@ -176,8 +179,10 @@ class Solver(object):
             for iteration in range(hps.dis_pretrain_iters):
                 data = next(self.data_loader)
                 c, x = self.permute_data(data)
+                noise = to_var(cc(gen_noise(x.size(1), x.size(2))), requires_grad=False)
+                x_n = x + noise 
                 # encode
-                enc = self.encode_step(x)
+                enc = self.encode_step(x_n)
                 # classify speaker
                 logits = self.clf_step(enc)
                 loss_clf = self.cal_loss(logits, c)
@@ -189,7 +194,7 @@ class Solver(object):
                 # calculate acc
                 acc = cal_acc(logits, c)
                 info = {
-                    f'{flag}/pre_loss_clf': loss_clf.data[0],
+                    f'{flag}/pre_loss_clf': loss_clf.item(),
                     f'{flag}/pre_acc': acc,
                 }
                 slot_value = (iteration + 1, hps.dis_pretrain_iters) + tuple([value for value in info.values()])
@@ -204,8 +209,10 @@ class Solver(object):
                 for step in range(hps.n_patch_steps):
                     data = next(self.data_loader)
                     c, x = self.permute_data(data)
-                    # encode
-                    enc = self.encode_step(x)
+                    noise = to_var(cc(gen_noise(x.size(1), x.size(2))), requires_grad=False)
+                    x_n = x + noise 
+                    ## encode
+                    enc = self.encode_step(x_n)
                     # sample c
                     c_prime = self.sample_c(x.size(0))
                     # generator
@@ -222,9 +229,9 @@ class Solver(object):
                     # calculate acc
                     acc = cal_acc(real_logits, c)
                     info = {
-                        f'{flag}/w_dis': w_dis.data[0],
-                        f'{flag}/gp': gp.data[0], 
-                        f'{flag}/real_loss_clf': loss_clf.data[0],
+                        f'{flag}/w_dis': w_dis.item(),
+                        f'{flag}/gp': gp.item(), 
+                        f'{flag}/real_loss_clf': loss_clf.item(),
                         f'{flag}/real_acc': acc, 
                     }
                     slot_value = (step, iteration+1, hps.patch_iters) + tuple([value for value in info.values()])
@@ -236,8 +243,10 @@ class Solver(object):
                 #=======train G=========#
                 data = next(self.data_loader)
                 c, x = self.permute_data(data)
+                noise = to_var(cc(gen_noise(x.size(1), x.size(2))), requires_grad=False)
+                x_n = x + noise 
                 # encode
-                enc = self.encode_step(x)
+                enc = self.encode_step(x_n)
                 # sample c
                 c_prime = self.sample_c(x.size(0))
                 # generator
@@ -254,8 +263,8 @@ class Solver(object):
                 # calculate acc
                 acc = cal_acc(fake_logits, c_prime)
                 info = {
-                    f'{flag}/loss_adv': loss_adv.data[0],
-                    f'{flag}/fake_loss_clf': loss_clf.data[0],
+                    f'{flag}/loss_adv': loss_adv.item(),
+                    f'{flag}/fake_loss_clf': loss_clf.item(),
                     f'{flag}/fake_acc': acc, 
                 }
                 slot_value = (iteration+1, hps.patch_iters) + tuple([value for value in info.values()])
@@ -291,7 +300,7 @@ class Solver(object):
                     # calculate acc
                     acc = cal_acc(logits, c)
                     info = {
-                        f'{flag}/D_loss_clf': loss_clf.data[0],
+                        f'{flag}/D_loss_clf': loss_clf.item(),
                         f'{flag}/D_acc': acc,
                     }
                     slot_value = (step, iteration + 1, hps.iters) + tuple([value for value in info.values()])
@@ -307,7 +316,7 @@ class Solver(object):
                 enc = self.encode_step(x)
                 # decode
                 x_tilde = self.decode_step(enc, c)
-                loss_rec = torch.mean(torch.abs(x_tilde - x))
+                loss_rec = torch.mean((x_tilde - x)**2)
                 # classify speaker
                 logits = self.clf_step(enc)
                 acc = cal_acc(logits, c)
@@ -319,13 +328,13 @@ class Solver(object):
                 grad_clip([self.Encoder, self.Decoder], self.hps.max_grad_norm)
                 self.ae_opt.step()
                 info = {
-                    f'{flag}/loss_rec': loss_rec.data[0],
-                    f'{flag}/G_loss_clf': loss_clf.data[0],
+                    f'{flag}/loss_rec': loss_rec.item(),
+                    f'{flag}/G_loss_clf': loss_clf.item(),
                     f'{flag}/alpha': current_alpha,
                     f'{flag}/G_acc': acc,
                 }
                 slot_value = (iteration + 1, hps.iters) + tuple([value for value in info.values()])
-                log = 'G:[%06d/%06d], loss_rec=%.2f, loss_clf=%.2f, alpha=%.2e, acc=%.2f'
+                log = 'G:[%06d/%06d], loss_rec=%.3f, loss_clf=%.2f, alpha=%.2e, acc=%.2f'
                 print(log % slot_value)
                 if iteration % 100 == 0:
                     for tag, value in info.items():
