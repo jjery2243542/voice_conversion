@@ -155,10 +155,8 @@ class Solver(object):
             for iteration in range(hps.enc_pretrain_iters):
                 data = next(self.data_loader)
                 c, x = self.permute_data(data)
-                noise = to_var(cc(gen_noise(x.size(1), x.size(2))), requires_grad=False)
-                x_n = x + noise 
                 # encode
-                enc = self.encode_step(x_n)
+                enc = self.encode_step(x)
                 x_tilde = self.decode_step(enc, c)
                 loss_rec = torch.mean((x_tilde - x)**2)
                 reset_grad([self.Encoder, self.Decoder])
@@ -179,10 +177,8 @@ class Solver(object):
             for iteration in range(hps.dis_pretrain_iters):
                 data = next(self.data_loader)
                 c, x = self.permute_data(data)
-                noise = to_var(cc(gen_noise(x.size(1), x.size(2))), requires_grad=False)
-                x_n = x + noise 
                 # encode
-                enc = self.encode_step(x_n)
+                enc = self.encode_step(x)
                 # classify speaker
                 logits = self.clf_step(enc)
                 loss_clf = self.cal_loss(logits, c)
@@ -209,10 +205,8 @@ class Solver(object):
                 for step in range(hps.n_patch_steps):
                     data = next(self.data_loader)
                     c, x = self.permute_data(data)
-                    noise = to_var(cc(gen_noise(x.size(1), x.size(2))), requires_grad=False)
-                    x_n = x + noise 
                     ## encode
-                    enc = self.encode_step(x_n)
+                    enc = self.encode_step(x)
                     # sample c
                     c_prime = self.sample_c(x.size(0))
                     # generator
@@ -243,10 +237,8 @@ class Solver(object):
                 #=======train G=========#
                 data = next(self.data_loader)
                 c, x = self.permute_data(data)
-                noise = to_var(cc(gen_noise(x.size(1), x.size(2))), requires_grad=False)
-                x_n = x + noise 
                 # encode
-                enc = self.encode_step(x_n)
+                enc = self.encode_step(x)
                 # sample c
                 c_prime = self.sample_c(x.size(0))
                 # generator
