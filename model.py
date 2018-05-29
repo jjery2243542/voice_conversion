@@ -167,13 +167,13 @@ class WeakSpeakerClassifier(nn.Module):
     def __init__(self, c_in=512, c_h=512, n_class=8, dp=0.1, ns=0.01):
         super(WeakSpeakerClassifier, self).__init__()
         self.dp, self.ns = dp, ns
-        self.conv1 = nn.Conv1d(c_in, c_h, kernel_size=3, stride=2)
-        self.conv2 = nn.Conv1d(c_h, c_h, kernel_size=3, stride=2)
-        self.conv3 = nn.Conv1d(c_h, n_class, kernel_size=4)
+        self.conv1 = nn.Conv1d(c_in, c_h, kernel_size=3)
+        self.conv2 = nn.Conv1d(c_h, c_h//2, kernel_size=3)
+        self.conv3 = nn.Conv1d(c_h//2, n_class, kernel_size=16)
         self.drop1 = nn.Dropout(p=dp)
         self.drop2 = nn.Dropout(p=dp)
         self.ins_norm1 = nn.InstanceNorm1d(c_h)
-        self.ins_norm2 = nn.InstanceNorm1d(c_h)
+        self.ins_norm2 = nn.InstanceNorm1d(c_h//2)
 
     def conv_block(self, x, conv_layers, after_layers, res=True):
         out = x
@@ -205,10 +205,9 @@ class SpeakerClassifier(nn.Module):
         self.conv4 = nn.Conv1d(c_h, c_h, kernel_size=5)
         self.conv5 = nn.Conv1d(c_h, c_h, kernel_size=5)
         self.conv6 = nn.Conv1d(c_h, c_h, kernel_size=5)
-        self.conv6 = nn.Conv1d(c_h, c_h, kernel_size=5)
-        self.conv7 = nn.Conv1d(c_h, c_h, kernel_size=5)
-        self.conv8 = nn.Conv1d(c_h, c_h, kernel_size=5)
-        self.conv9 = nn.Conv1d(c_h, n_class, kernel_size=16)
+        self.conv7 = nn.Conv1d(c_h, c_h//2, kernel_size=3)
+        self.conv8 = nn.Conv1d(c_h//2, c_h//4, kernel_size=3)
+        self.conv9 = nn.Conv1d(c_h//4, n_class, kernel_size=16)
         self.drop1 = nn.Dropout(p=dp)
         self.drop2 = nn.Dropout(p=dp)
         self.drop3 = nn.Dropout(p=dp)
@@ -216,7 +215,7 @@ class SpeakerClassifier(nn.Module):
         self.ins_norm1 = nn.InstanceNorm1d(c_h)
         self.ins_norm2 = nn.InstanceNorm1d(c_h)
         self.ins_norm3 = nn.InstanceNorm1d(c_h)
-        self.ins_norm4 = nn.InstanceNorm1d(c_h)
+        self.ins_norm4 = nn.InstanceNorm1d(c_h//4)
 
     def conv_block(self, x, conv_layers, after_layers, res=True):
         out = x
@@ -233,7 +232,7 @@ class SpeakerClassifier(nn.Module):
         out = self.conv_block(x, [self.conv1, self.conv2], [self.ins_norm1, self.drop1], res=False)
         out = self.conv_block(out, [self.conv3, self.conv4], [self.ins_norm2, self.drop2], res=True)
         out = self.conv_block(out, [self.conv5, self.conv6], [self.ins_norm3, self.drop3], res=True)
-        out = self.conv_block(out, [self.conv7, self.conv8], [self.ins_norm4, self.drop4], res=True)
+        out = self.conv_block(out, [self.conv7, self.conv8], [self.ins_norm4, self.drop4], res=False)
         out = self.conv9(out)
         out = out.view(out.size()[0], -1)
         return out
@@ -360,12 +359,12 @@ class Decoder(nn.Module):
         # first layer
         x_add = x + emb.view(emb.size(0), emb.size(1), 1)
         out = pad_layer(x_add, conv_layers[0])
-        out = F.leaky_relu(out, negative_slope=self.ns)
+        out = F.relu(out, negative_slope=self.ns)
         # upsample by pixelshuffle
         out = pixel_shuffle_1d(out, upscale_factor=2)
         out = out + emb.view(emb.size(0), emb.size(1), 1)
         out = pad_layer(out, conv_layers[1])
-        out = F.leaky_relu(out, negative_slope=self.ns)
+        out = F.relu(out, negative_slope=self.ns)
         out = norm_layer(out)
         if res:
             x_up = upsample(x, scale_factor=2)
@@ -377,7 +376,7 @@ class Decoder(nn.Module):
         for layer in layers:
             out = out + emb.view(emb.size(0), emb.size(1), 1)
             out = linear(out, layer)
-            out = F.leaky_relu(out, negative_slope=self.ns)
+            out = F.relu(out, negative_slope=self.ns)
         out = norm_layer(out)
         if res:
             out = out + x
@@ -398,7 +397,7 @@ class Decoder(nn.Module):
         out = torch.cat([out, out_rnn], dim=1)
         out = append_emb(self.emb5(c), out.size(2), out)
         out = linear(out, self.dense5)
-        out = F.leaky_relu(out, negative_slope=self.ns)
+        out = F.relu(out, negative_slope=self.ns)
         out = linear(out, self.linear)
         #out = torch.tanh(out)
         return out
@@ -442,7 +441,7 @@ class Encoder(nn.Module):
         out = x
         for layer in conv_layers:
             out = pad_layer(out, layer)
-            out = F.leaky_relu(out, negative_slope=self.ns)
+            out = F.relu(out, negative_slope=self.ns)
         for layer in norm_layers:
             out = layer(out)
         if res:
@@ -455,7 +454,7 @@ class Encoder(nn.Module):
         out = x
         for layer in layers:
             out = linear(out, layer)
-            out = F.leaky_relu(out, negative_slope=self.ns)
+            out = F.relu(out, negative_slope=self.ns)
         for layer in norm_layers:
             out = layer(out)
         if res:
@@ -468,7 +467,7 @@ class Encoder(nn.Module):
             out = pad_layer(x, l)
             outs.append(out)
         out = torch.cat(outs + [x], dim=1)
-        out = F.leaky_relu(out, negative_slope=self.ns)
+        out = F.relu(out, negative_slope=self.ns)
         out = self.conv_block(out, [self.conv2], [self.ins_norm1, self.drop1], res=False)
         out = self.conv_block(out, [self.conv3, self.conv4], [self.ins_norm2, self.drop2])
         out = self.conv_block(out, [self.conv5, self.conv6], [self.ins_norm3, self.drop3])
@@ -479,7 +478,7 @@ class Encoder(nn.Module):
         out_rnn = RNN(out, self.RNN)
         out = torch.cat([out, out_rnn], dim=1)
         out = linear(out, self.linear)
-        out = F.leaky_relu(out, negative_slope=self.ns)
+        out = F.relu(out, negative_slope=self.ns)
         return out
 
 if __name__ == '__main__':
