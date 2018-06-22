@@ -185,8 +185,6 @@ class Sampler(object):
                     mapping[(speaker, utt_id)] = length
         return mapping
 
-
-
     def rm_too_short_utt(self, limit=None):
         if not limit:
             limit = self.seg_len * 2
@@ -207,7 +205,7 @@ class Sampler(object):
                     self.male_ids.append(info[0])
                 self.accent[info[3]].append(info[0])
 
-    def read_speakers(self, path='/storage/feature/voice_conversion/vctk/en_speaker_used.txt'):
+    def read_speakers(self, path='/storage/feature/voice_conversion/vctk/8_speakers.txt'):
         with open(path) as f:
             speakers = [line.strip() for line in f]
             return speakers     
