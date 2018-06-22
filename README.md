@@ -1,15 +1,7 @@
-# voice conversion via disentangle context representation
+# Multi-target Voice Conversion without Parallel Data by Adversarially Learning Disentangled Audio Representations
 
-## TODO
-- Calculate similarity in latent space
-- Patch GAN with condition
-- Patch GAN with classification
-- Patch GAN with random flip the label?
-- i-vector extraction
-- Patch GAN with i-vector prediction
-- add classifier to embedding
-- add postnet and mel-scale
-- 口音轉換
-- instance norm
-- add speaker classifier
-- two stage training 
+This is the source code for [Multi-target Voice Conversion without Parallel Data by Adversarially Learning Disentangled Audio Representations](https://arxiv.org/pdf/1804.02812), which is accepted in Interspeech 2018, and is selected as the finallist of best student paper award.
+
+You can find the conversion sample at [here](https://jjery2243542.github.io/voice_conversion_demo/).
+
+The source code is currently a little messy, it will be refactored before the conference.
