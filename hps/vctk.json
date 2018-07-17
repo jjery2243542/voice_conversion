@@ -13,7 +13,7 @@
     "max_step": 5,
     "seg_len": 128,
     "emb_size": 128,
-    "n_speakers": 20,
+    "n_speakers": 8,
     "n_latent_steps": 5,
     "n_patch_steps": 0,
     "batch_size": 32,

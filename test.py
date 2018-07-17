@@ -12,16 +12,17 @@ from solver import Solver
 from preprocess.tacotron.norm_utils import spectrogram2wav, get_spectrograms
 #from preprocess.tacotron.audio import inv_spectrogram, save_wav
 from scipy.io.wavfile import write
-from preprocess.tacotron.mcep import mc2wav
+#from preprocess.tacotron.mcep import mc2wav
 import glob
+import os
 
 if __name__ == '__main__':
     feature = 'sp'
     hps = Hps()
-    hps.load('./hps/tv.json')
+    hps.load('./hps/vctk.json')
     hps_tuple = hps.get_tuple()
     solver = Solver(hps_tuple, None)
-    solver.load_model('/storage/model/voice_conversion/tv/model_1e-3_patch.pkl-2000')
+    solver.load_model('/storage/model/voice_conversion/vctk/clf/norm/8_speakers_1e-3.pkl-149999')
     if feature == 'mc':
         # indexer to extract data
         indexer = Indexer()
@@ -59,17 +60,44 @@ if __name__ == '__main__':
             wav_data = mc2wav(log_f0, src_f0_mean, src_f0_std, tar_f0_mean, tar_f0_std, ap, truncated_result, mc_mean, mc_std)
             write(f'output{i+1}.wav', rate=16000, data=wav_data)
     else:
-        filename = '/storage/datasets/teacher_voice/data/lin_shan_lee/wav/20060530-1-002380.wav' 
-        #spec = np.loadtxt(filename)
-        _, spec = get_spectrograms(filename)
-        spec_expand = np.expand_dims(spec, axis=0)
-        spec_tensor = torch.from_numpy(spec_expand).type(torch.FloatTensor)
-        c = Variable(torch.from_numpy(np.array([1]))).cuda()
-        result = solver.test_step(spec_tensor, c, gen=True)
-        result = result.squeeze(axis=0).transpose((1, 0))
-        print(result.shape)
-        wav_data = spectrogram2wav(result)
-        write('result.wav', rate=16000, data=wav_data)
+        one = False
+        if one == True:
+            filename = '/storage/datasets/teacher_voice/data/lin_shan_lee/wav/20060530-1-002380.wav' 
+            #spec = np.loadtxt(filename)
+            _, spec = get_spectrograms(filename)
+            spec_expand = np.expand_dims(spec, axis=0)
+            spec_tensor = torch.from_numpy(spec_expand).type(torch.FloatTensor)
+            c = Variable(torch.from_numpy(np.array([1]))).cuda()
+            result = solver.test_step(spec_tensor, c, gen=True)
+            result = result.squeeze(axis=0).transpose((1, 0))
+            print(result.shape)
+            wav_data = spectrogram2wav(result)
+            write('result.wav', rate=16000, data=wav_data)
+        else:
+            directory = './for_VC/hy/'
+            for filename in glob.glob(os.path.join(directory, '*.wav')):
+                _, sub_filename = filename.rsplit('/', maxsplit=1)
+                _, spec = get_spectrograms(filename)
+                spec_expand = np.expand_dims(spec, axis=0)
+                spec_tensor = torch.from_numpy(spec_expand).type(torch.FloatTensor)
+                c = Variable(torch.from_numpy(np.array([1]))).cuda()
+                if spec_tensor.size(1) > 1000:
+                    result_list = []
+                    for small_spec_tensor in spec_tensor.split(split_size=400, dim=1):
+                        print(small_spec_tensor.size())
+                        if small_spec_tensor.size(1) >= 10:
+                            result = solver.test_step(small_spec_tensor, c, gen=True)
+                            result = result.squeeze(axis=0).transpose((1, 0))
+                            result_list.append(result)
+                    result = np.concatenate(result_list, axis=0)
+                    print(result.shape)
+                    wav_data = spectrogram2wav(result)
+                else:
+                    result = solver.test_step(spec_tensor, c, gen=True)
+                    result = result.squeeze(axis=0).transpose((1, 0))
+                    print(result.shape)
+                    wav_data = spectrogram2wav(result)
+                write(os.path.join('./for_VC/hy/result/', sub_filename), rate=16000, data=wav_data)
         #result = solver.test_step(spec_tensor, c1, gen=True)
         #spec = np.loadtxt('preprocess/test_code/vcc/lin.npy')
         #spec2 = np.loadtxt('preprocess/test_code/vcc/lin2.npy')
