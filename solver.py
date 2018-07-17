@@ -158,7 +158,7 @@ class Solver(object):
                 # encode
                 enc = self.encode_step(x)
                 x_tilde = self.decode_step(enc, c)
-                loss_rec = torch.mean((x_tilde - x)**2)
+                loss_rec = torch.mean(torch.abs(x_tilde - x))
                 reset_grad([self.Encoder, self.Decoder])
                 loss_rec.backward()
                 grad_clip([self.Encoder, self.Decoder], self.hps.max_grad_norm)
@@ -308,7 +308,7 @@ class Solver(object):
                 enc = self.encode_step(x)
                 # decode
                 x_tilde = self.decode_step(enc, c)
-                loss_rec = torch.mean((x_tilde - x)**2)
+                loss_rec = torch.mean(torch.abs(x_tilde - x))
                 # classify speaker
                 logits = self.clf_step(enc)
                 acc = cal_acc(logits, c)
