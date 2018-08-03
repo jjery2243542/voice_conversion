@@ -4,6 +4,17 @@ import torch.nn.functional as F
 import torch
 from torch.autograd import Variable
 
+class GradReverse(torch.autograd.Function):
+    @staticmethod
+    #def forward(ctx, x, _lambda=0.0001):
+    def forward(ctx, x):
+        #ctx._lambda = _lambda
+        return x.view_as(x)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        return grad_output.neg()
+
 def pad_layer(inp, layer, is_2d=False):
     if type(layer.kernel_size) == tuple:
         kernel_size = layer.kernel_size[0]
@@ -108,19 +119,22 @@ class PatchDiscriminator(nn.Module):
         self.conv3 = nn.Conv2d(128, 256, kernel_size=5, stride=2)
         self.conv4 = nn.Conv2d(256, 512, kernel_size=5, stride=2)
         self.conv5 = nn.Conv2d(512, 512, kernel_size=5, stride=2)
-        self.conv6 = nn.Conv2d(512, 1, kernel_size=1)
+        self.conv6 = nn.Conv2d(512, 32, kernel_size=1)
+        self.conv7 = nn.Conv2d(32, 1, kernel_size=(17, 4))
         #self.conv_classify = nn.Conv2d(512, n_class, kernel_size=(17, 4))
-        self.conv_classify = nn.Conv2d(512, n_class, kernel_size=(17, 4))
+        self.conv_classify = nn.Conv2d(32, n_class, kernel_size=(17, 4))
         self.drop1 = nn.Dropout2d(p=dp)
         self.drop2 = nn.Dropout2d(p=dp)
         self.drop3 = nn.Dropout2d(p=dp)
         self.drop4 = nn.Dropout2d(p=dp)
         self.drop5 = nn.Dropout2d(p=dp)
+        self.drop6 = nn.Dropout2d(p=dp)
         self.ins_norm1 = nn.InstanceNorm2d(self.conv1.out_channels)
         self.ins_norm2 = nn.InstanceNorm2d(self.conv2.out_channels)
         self.ins_norm3 = nn.InstanceNorm2d(self.conv3.out_channels)
         self.ins_norm4 = nn.InstanceNorm2d(self.conv4.out_channels)
         self.ins_norm5 = nn.InstanceNorm2d(self.conv5.out_channels)
+        self.ins_norm6 = nn.InstanceNorm2d(self.conv6.out_channels)
 
     def conv_block(self, x, conv_layer, after_layers):
         out = pad_layer(x, conv_layer, is_2d=True)
@@ -136,18 +150,50 @@ class PatchDiscriminator(nn.Module):
         out = self.conv_block(out, self.conv3, [self.ins_norm3, self.drop3])
         out = self.conv_block(out, self.conv4, [self.ins_norm4, self.drop4])
         out = self.conv_block(out, self.conv5, [self.ins_norm5, self.drop5])
+        out = self.conv_block(out, self.conv6, [self.ins_norm6, self.drop6])
         # GAN output value
-        val = pad_layer(out, self.conv6, is_2d=True)
+        val = self.conv7(out)
         val = val.view(val.size(0), -1)
         mean_val = torch.mean(val, dim=1)
         if classify:
             # classify
             logits = self.conv_classify(out)
-            print(logits.size())
             logits = logits.view(logits.size(0), -1)
             return mean_val, logits
         else:
             return mean_val
+
+class WeakSpeakerClassifier(nn.Module):
+    def __init__(self, c_in=512, c_h=512, n_class=8, dp=0.1, ns=0.01):
+        super(WeakSpeakerClassifier, self).__init__()
+        self.dp, self.ns = dp, ns
+        self.conv1 = nn.Conv1d(c_in, c_h, kernel_size=3)
+        self.conv2 = nn.Conv1d(c_h, c_h//2, kernel_size=3)
+        self.conv3 = nn.Conv1d(c_h//2, n_class, kernel_size=16)
+        self.drop1 = nn.Dropout(p=dp)
+        self.drop2 = nn.Dropout(p=dp)
+        self.ins_norm1 = nn.InstanceNorm1d(c_h)
+        self.ins_norm2 = nn.InstanceNorm1d(c_h//2)
+
+    def conv_block(self, x, conv_layers, after_layers, res=True):
+        out = x
+        for layer in conv_layers:
+            out = pad_layer(out, layer)
+            out = F.leaky_relu(out, negative_slope=self.ns)
+        for layer in after_layers:
+            out = layer(out)
+        if res:
+            out = out + x
+        return out
+
+    def forward(self, x, _lambda=0.0001, gr=False):
+        if gr:
+            x = GradReverse(_lambda=_lambda).apply(x)
+        out = self.conv_block(x, [self.conv1], [self.ins_norm1, self.drop1], res=False)
+        out = self.conv_block(out, [self.conv2], [self.ins_norm2, self.drop2], res=False)
+        out = self.conv3(out)
+        out = out.view(out.size()[0], -1)
+        return out
 
 class SpeakerClassifier(nn.Module):
     def __init__(self, c_in=512, c_h=512, n_class=8, dp=0.1, ns=0.01):
@@ -159,10 +205,9 @@ class SpeakerClassifier(nn.Module):
         self.conv4 = nn.Conv1d(c_h, c_h, kernel_size=5)
         self.conv5 = nn.Conv1d(c_h, c_h, kernel_size=5)
         self.conv6 = nn.Conv1d(c_h, c_h, kernel_size=5)
-        self.conv6 = nn.Conv1d(c_h, c_h, kernel_size=5)
-        self.conv7 = nn.Conv1d(c_h, c_h, kernel_size=5)
-        self.conv8 = nn.Conv1d(c_h, c_h, kernel_size=5)
-        self.conv9 = nn.Conv1d(c_h, n_class, kernel_size=16)
+        self.conv7 = nn.Conv1d(c_h, c_h//2, kernel_size=3)
+        self.conv8 = nn.Conv1d(c_h//2, c_h//4, kernel_size=3)
+        self.conv9 = nn.Conv1d(c_h//4, n_class, kernel_size=16)
         self.drop1 = nn.Dropout(p=dp)
         self.drop2 = nn.Dropout(p=dp)
         self.drop3 = nn.Dropout(p=dp)
@@ -170,7 +215,7 @@ class SpeakerClassifier(nn.Module):
         self.ins_norm1 = nn.InstanceNorm1d(c_h)
         self.ins_norm2 = nn.InstanceNorm1d(c_h)
         self.ins_norm3 = nn.InstanceNorm1d(c_h)
-        self.ins_norm4 = nn.InstanceNorm1d(c_h)
+        self.ins_norm4 = nn.InstanceNorm1d(c_h//4)
 
     def conv_block(self, x, conv_layers, after_layers, res=True):
         out = x
@@ -187,7 +232,7 @@ class SpeakerClassifier(nn.Module):
         out = self.conv_block(x, [self.conv1, self.conv2], [self.ins_norm1, self.drop1], res=False)
         out = self.conv_block(out, [self.conv3, self.conv4], [self.ins_norm2, self.drop2], res=True)
         out = self.conv_block(out, [self.conv5, self.conv6], [self.ins_norm3, self.drop3], res=True)
-        out = self.conv_block(out, [self.conv7, self.conv8], [self.ins_norm4, self.drop4], res=True)
+        out = self.conv_block(out, [self.conv7, self.conv8], [self.ins_norm4, self.drop4], res=False)
         out = self.conv9(out)
         out = out.view(out.size()[0], -1)
         return out
@@ -280,24 +325,22 @@ class CBHG(nn.Module):
         out = F.sogmoid(out)
         return out
 
-
 class Decoder(nn.Module):
     def __init__(self, c_in=512, c_out=513, c_h=512, c_a=8, emb_size=128, ns=0.2):
         super(Decoder, self).__init__()
         self.ns = ns
-        self.conv1 = nn.Conv1d(c_in + emb_size, 2*c_h, kernel_size=3)
-        self.conv2 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=3)
-        self.conv3 = nn.Conv1d(c_h + emb_size, 2*c_h, kernel_size=3)
-        self.conv4 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=3)
-        self.conv5 = nn.Conv1d(c_h + emb_size, 2*c_h, kernel_size=3)
-        self.conv6 = nn.Conv1d(c_h + emb_size, c_h, kernel_size=3)
-        self.dense1 = nn.Linear(c_h + emb_size, c_h)
-        self.dense2 = nn.Linear(c_h + emb_size, c_h)
-        self.dense3 = nn.Linear(c_h + emb_size, c_h)
-        self.dense4 = nn.Linear(c_h + emb_size, c_h)
-        self.RNN = nn.GRU(input_size=c_h + emb_size, hidden_size=c_h//2, num_layers=1, bidirectional=True)
-        self.emb = nn.Embedding(c_a, emb_size)
-        self.dense5 = nn.Linear(2*c_h + emb_size, c_h)
+        self.conv1 = nn.Conv1d(c_in, 2*c_h, kernel_size=3)
+        self.conv2 = nn.Conv1d(c_h, c_h, kernel_size=3)
+        self.conv3 = nn.Conv1d(c_h, 2*c_h, kernel_size=3)
+        self.conv4 = nn.Conv1d(c_h, c_h, kernel_size=3)
+        self.conv5 = nn.Conv1d(c_h, 2*c_h, kernel_size=3)
+        self.conv6 = nn.Conv1d(c_h, c_h, kernel_size=3)
+        self.dense1 = nn.Linear(c_h, c_h)
+        self.dense2 = nn.Linear(c_h, c_h)
+        self.dense3 = nn.Linear(c_h, c_h)
+        self.dense4 = nn.Linear(c_h, c_h)
+        self.RNN = nn.GRU(input_size=c_h, hidden_size=c_h//2, num_layers=1, bidirectional=True)
+        self.dense5 = nn.Linear(2*c_h + c_h, c_h)
         self.linear = nn.Linear(c_h, c_out)
         # normalization layer
         self.ins_norm1 = nn.InstanceNorm1d(c_h)
@@ -305,15 +348,21 @@ class Decoder(nn.Module):
         self.ins_norm3 = nn.InstanceNorm1d(c_h)
         self.ins_norm4 = nn.InstanceNorm1d(c_h)
         self.ins_norm5 = nn.InstanceNorm1d(c_h)
+        # embedding layer
+        self.emb1 = nn.Embedding(c_a, c_h)
+        self.emb2 = nn.Embedding(c_a, c_h)
+        self.emb3 = nn.Embedding(c_a, c_h)
+        self.emb4 = nn.Embedding(c_a, c_h)
+        self.emb5 = nn.Embedding(c_a, c_h)
 
     def conv_block(self, x, conv_layers, norm_layer, emb, res=True):
         # first layer
-        x_append = append_emb(emb, x.size(2), x)
-        out = pad_layer(x_append, conv_layers[0])
+        x_add = x + emb.view(emb.size(0), emb.size(1), 1)
+        out = pad_layer(x_add, conv_layers[0])
         out = F.leaky_relu(out, negative_slope=self.ns)
         # upsample by pixelshuffle
         out = pixel_shuffle_1d(out, upscale_factor=2)
-        out = append_emb(emb, out.size(2), out)
+        out = out + emb.view(emb.size(0), emb.size(1), 1)
         out = pad_layer(out, conv_layers[1])
         out = F.leaky_relu(out, negative_slope=self.ns)
         out = norm_layer(out)
@@ -325,7 +374,7 @@ class Decoder(nn.Module):
     def dense_block(self, x, emb, layers, norm_layer, res=True):
         out = x
         for layer in layers:
-            out = append_emb(emb, out.size(2), out)
+            out = out + emb.view(emb.size(0), emb.size(1), 1)
             out = linear(out, layer)
             out = F.leaky_relu(out, negative_slope=self.ns)
         out = norm_layer(out)
@@ -334,26 +383,27 @@ class Decoder(nn.Module):
         return out
 
     def forward(self, x, c):
-        emb = self.emb(c)
         # conv layer
-        out = self.conv_block(x, [self.conv1, self.conv2], self.ins_norm1, emb, res=True )
-        out = self.conv_block(out, [self.conv3, self.conv4], self.ins_norm2, emb, res=True)
-        out = self.conv_block(out, [self.conv5, self.conv6], self.ins_norm3, emb, res=True)
+        out = self.conv_block(x, [self.conv1, self.conv2], self.ins_norm1, self.emb1(c), res=True )
+        out = self.conv_block(out, [self.conv3, self.conv4], self.ins_norm2, self.emb2(c), res=True)
+        out = self.conv_block(out, [self.conv5, self.conv6], self.ins_norm3, self.emb3(c), res=True)
         # dense layer
-        out = self.dense_block(out, emb, [self.dense1, self.dense2], self.ins_norm4, res=True)
-        out = self.dense_block(out, emb, [self.dense3, self.dense4], self.ins_norm5, res=True)
-        out_appended = append_emb(emb, out.size(2), out)
+        out = self.dense_block(out, self.emb4(c), [self.dense1, self.dense2], self.ins_norm4, res=True)
+        out = self.dense_block(out, self.emb4(c), [self.dense3, self.dense4], self.ins_norm5, res=True)
+        emb = self.emb5(c)
+        out_add = out + emb.view(emb.size(0), emb.size(1), 1)
         # rnn layer
-        out_rnn = RNN(out_appended, self.RNN)
+        out_rnn = RNN(out_add, self.RNN)
         out = torch.cat([out, out_rnn], dim=1)
-        out = append_emb(emb, out.size(2), out)
+        out = append_emb(self.emb5(c), out.size(2), out)
         out = linear(out, self.dense5)
         out = F.leaky_relu(out, negative_slope=self.ns)
         out = linear(out, self.linear)
+        #out = torch.tanh(out)
         return out
 
 class Encoder(nn.Module):
-    def __init__(self, c_in=513, c_h1=128, c_h2=512, c_h3=128, ns=0.2, dp=0.3):
+    def __init__(self, c_in=513, c_h1=128, c_h2=512, c_h3=128, ns=0.2, dp=0.5):
         super(Encoder, self).__init__()
         self.ns = ns
         self.conv1s = nn.ModuleList(
@@ -379,6 +429,7 @@ class Encoder(nn.Module):
         self.ins_norm4 = nn.InstanceNorm1d(c_h2)
         self.ins_norm5 = nn.InstanceNorm1d(c_h2)
         self.ins_norm6 = nn.InstanceNorm1d(c_h2)
+        # dropout layer
         self.drop1 = nn.Dropout(p=dp)
         self.drop2 = nn.Dropout(p=dp)
         self.drop3 = nn.Dropout(p=dp)
@@ -435,16 +486,16 @@ if __name__ == '__main__':
     D = Decoder().cuda()
     C = LatentDiscriminator().cuda()
     P = PatchDiscriminator().cuda()
-    #S = SpeakerClassifier().cuda()
+    S = SpeakerClassifier().cuda()
     #cbhg = CBHG().cuda()
     inp = Variable(torch.randn(16, 513, 128)).cuda()
     e1 = E1(inp)
     print(e1.size())
-    #s1 = S(e1)
+    s1 = S(e1)
     c = Variable(torch.from_numpy(np.random.randint(8, size=(16)))).cuda()
     d = D(e1, c)
     print(d.size())
     p1, p2 = P(d, classify=True)
     print(p1.size(), p2.size())
-    c = C(torch.cat([e1, e1],dim=1))
-    print(c.size())
+    #c = C(torch.cat([e1, e1],dim=1))
+    #print(c.size())

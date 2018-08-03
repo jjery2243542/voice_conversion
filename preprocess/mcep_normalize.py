@@ -12,8 +12,9 @@ if __name__ == '__main__':
             # normalized f0
             utt_f0 = [f_in[f'train/{speaker}/{utt_id}/log_f0'][()] for utt_id in f_in[f'train/{speaker}'].keys()]
             all_f0 = np.concatenate(utt_f0, axis=0)
-            print(all_f0.shape)
-            f0_mean, f0_std = np.mean(all_f0), np.std(all_f0)
+            index = np.where(all_f0 > 1e-10)[0]
+            print(all_f0.shape, index.shape)
+            f0_mean, f0_std = np.mean(all_f0[index]), np.std(all_f0[index])
             f_out.create_dataset(f'{speaker}/f0_mean', data=f0_mean, dtype=np.float32)
             f_out.create_dataset(f'{speaker}/f0_std', data=f0_std, dtype=np.float32)
             # processing MCEP

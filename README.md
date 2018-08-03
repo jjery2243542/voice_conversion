@@ -1,7 +1,8 @@
-# Multi-target Voice Conversion without Parallel Data by Adversarially Learning Disentangled Audio Representations
+# Voice conversion via disentangle context representation (Code for paper:https://arxiv.org/pdf/1804.02812.pdf )
 
-This is the source code for [Multi-target Voice Conversion without Parallel Data by Adversarially Learning Disentangled Audio Representations](https://arxiv.org/pdf/1804.02812), which is accepted in Interspeech 2018, and selected as the finallist of best student paper award.
+Steps for training:
+1.) Use make_dataset_vctk.py to convert the VCTK corpus into training data.
+2.) Use make_single_samples.py to make the data feed dictionary/log used in training.
+3.) Train using main.py
+4.) Generate converted samples using convert.py
 
-You can find the conversion sample at [here](https://jjery2243542.github.io/voice_conversion_demo/).
-
-The source code is currently a little messy, it will be refactored before the conference.

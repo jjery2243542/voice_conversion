@@ -14,7 +14,6 @@ import sys
 import numpy as np
 import tensorflow as tf
 
-
 class hyperparams(object):
     def __init__(self):
         self.sr = 16000 # Sampling rate. Paper => 24000
@@ -27,6 +26,24 @@ class hyperparams(object):
         self.power = 1.2 # Exponent for amplifying the predicted magnitude
         self.n_iter = 200 # Number of inversion iterations 
         self.use_log_magnitude = True # if False, use magnitude
+'''
+class hyperparams(object):
+    def __init__(self):
+    max_duration = 10.0
+    # signal processing
+    sr = 16000 # Sample rate.
+    n_fft = 1024 # fft points (samples)
+    frame_shift = 0.0125 # seconds
+    frame_length = 0.05 # seconds
+    hop_length = int(sr*frame_shift) # samples.
+    win_length = int(sr*frame_length) # samples.
+    n_mels = 80 # Number of Mel banks to generate
+    power = 1.2 # Exponent for amplifying the predicted magnitude
+    n_iter = 300 # Number of inversion iterations
+    preemphasis = .97 # or None
+    max_db = 100
+    ref_db = 20
+'''
 
 hp = hyperparams()
 
@@ -34,13 +51,14 @@ def get_spectrograms(sound_file):
     '''Extracts melspectrogram and log magnitude from given `sound_file`.
     Args:
       sound_file: A string. Full path of a sound file.
-
     Returns:
       Transposed S: A 2d array. A transposed melspectrogram with shape of (T, n_mels)
       Transposed magnitude: A 2d array.Has shape of (T, 1+hp.n_fft//2)
     '''
     # Loading sound file
     y, sr = librosa.load(sound_file, sr=hp.sr) # or set sr to hp.sr.
+    # Trimming
+    y, _ = librosa.effects.trim(y)
     # stft. D: (1+n_fft//2, T)
     D = librosa.stft(y=y,
                      n_fft=hp.n_fft, 
@@ -79,6 +97,7 @@ def reduce_frames(arry, step, r):
      
     Returns:
       A 2d array with shape of [-1, C*r]
+<<<<<<< 2b70e2092593744c2d202685786864bd95f9eb70
     '''
     T = arry.shape[0]
     num_padding = (step*r) - (T % (step*r)) if T % (step*r) !=0 else 0
@@ -98,7 +117,26 @@ def reduce_frames(arry, step, r):
     return reshaped
 
 def spectrogram2wav(spectrogram):
+    T = arry.shape[0]
+    num_padding = (step*r) - (T % (step*r)) if T % (step*r) !=0 else 0
+    
+    arry = np.pad(arry, [[0, num_padding], [0, 0]], 'constant', constant_values=(0, 0))
+    T, C = arry.shape
+    sliced = np.split(arry, list(range(step, T, step)), axis=0)
+    
+    started = False
+    for i in range(0, len(sliced), r):
+        if not started:
+            reshaped = np.hstack(sliced[i:i+r])
+            started = True
+        else:
+            reshaped = np.vstack((reshaped, np.hstack(sliced[i:i+r])))
+            
+    return reshaped
+
+def spectrogram2wav(spectrogram):
     '''
+>>>>>>> can run
     spectrogram: [t, f], i.e. [t, nfft // 2 + 1]
     '''
     spectrogram = spectrogram.T  # [f, t]
