@@ -34,11 +34,11 @@ def mc2wav(log_f0, src_f0_mean, src_f0_std, tar_f0_mean, tar_f0_std, ap, mc, mc_
     return y
 
 if __name__ == '__main__':
-    f0, ap, mc = wav2mcep('/storage/datasets/VCTK/VCTK-Corpus/wav48/p225/p225_236.wav')
+    f0, ap, mc = wav2mcep('/media/arshsing/Storage/ML/_tensorflow3/VCTK-Corpus/wav48/p225/p225_236.wav')
     sp_new = pysptk.conversion.mc2sp(mc, alpha=0.41, fftlen=1024)
     log_f0 = np.log(f0 + 1e-10)
     src_f0_mean, src_f0_std = np.mean(log_f0), np.std(log_f0)
-    f0, _, _ = wav2mcep('/storage/datasets/VCTK/VCTK-Corpus/wav48/p226/p226_236.wav')
+    f0, _, _ = wav2mcep('/media/arshsing/Storage/ML/_tensorflow3/VCTK-Corpus/wav48/p226/p226_236.wav')
     tar_log_f0 = np.log(f0 + 1e-10)
     tar_f0_mean, tar_f0_std = np.mean(tar_log_f0), np.std(tar_log_f0)
     new_log_f0 = ((log_f0 - src_f0_mean) / src_f0_std) * tar_f0_std + tar_f0_mean
