@@ -115,6 +115,7 @@ def convert_all_mc(h5_path, src_speaker, tar_speaker, gen=False,
             sf.write(wav_path, wav_data, 16000, 'PCM_24')
 
 if __name__ == '__main__':
+<<<<<<< HEAD
     #h5_path = '/storage/feature/voice_conversion/vctk/mcep/trim_mc_en_india_backup.h5'
     root_dir = '/storage/result/voice_conversion/librispeech/'
     h5_path = '/storage/feature/voice_conversion/LibriSpeech/libri.h5'
@@ -157,3 +158,24 @@ if __name__ == '__main__':
     #        gen=True, model_path=model_path)
     #convert_all_sp(h5_path,'285','251',root_dir=os.path.join(root_dir, 'p285_p251'), 
     #        gen=True, model_path=model_path)
+=======
+
+    root_dir = './results/'
+    h5_path = '/media/arshsing/Storage/ML/ObEn/code/vctk-multi-target-imp/voice_conversion/vctk_random20_setok2.h5'
+    model_path = '/media/arshsing/Storage/ML/ObEn/code/models/single_sample_model.pkl-149999'
+    speaker_used_path = './speakers_used.txt'
+
+    with open(speaker_used_path) as f:
+        speakers = [line.strip() for line in f]
+    for speaker_A in speakers:
+       for speaker_B in speakers:
+           if speaker_A == speaker_B:
+               continue
+           else:
+               dir_path = os.path.join(root_dir, f'p{speaker_A}_p{speaker_B}')
+               if not os.path.exists(dir_path):
+                   os.makedirs(dir_path)
+               convert_all_sp(h5_path,speaker_A,speaker_B,
+                       root_dir=dir_path,
+                       gen=True, model_path=model_path)
+>>>>>>> 1fbdb8b8865b71091d2c4e69d0e0e77d0f96f13c

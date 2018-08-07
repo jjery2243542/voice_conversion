@@ -1,15 +1,8 @@
-# voice conversion via disentangle context representation
+# Voice conversion via disentangle context representation (Code for paper:https://arxiv.org/pdf/1804.02812.pdf )
 
-## TODO
-- Calculate similarity in latent space
-- Patch GAN with condition
-- Patch GAN with classification
-- Patch GAN with random flip the label?
-- i-vector extraction
-- Patch GAN with i-vector prediction
-- add classifier to embedding
-- add postnet and mel-scale
-- 口音轉換
-- instance norm
-- add speaker classifier
-- two stage training 
+Steps for training:
+1.) Use make_dataset_vctk.py to convert the VCTK corpus into training data.
+2.) Use make_single_samples.py to make the data feed dictionary/log used in training.
+3.) Train using main.py
+4.) Generate converted samples using convert.py
+
