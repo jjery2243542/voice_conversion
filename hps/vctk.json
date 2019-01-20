@@ -1,7 +1,7 @@
 {
     "lr": 0.0001,
     "alpha_dis": 1,
-    "alpha_enc": 0.001,
+    "alpha_enc": 0.01,
     "beta_dis": 1,
     "beta_gen": 1,
     "beta_clf": 1,
