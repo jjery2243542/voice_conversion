@@ -20,6 +20,6 @@
     "lat_sched_iters": 50000,
     "enc_pretrain_iters": 8000,
     "dis_pretrain_iters": 20000,
-    "patch_iters": 0,
-    "iters": 200000
+    "patch_iters": 50000,
+    "iters": 100000
 }
