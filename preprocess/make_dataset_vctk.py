@@ -38,8 +38,7 @@ if __name__ == '__main__':
             speaker_id, utt_id = re.match(r'p(\d+)_(\d+)\.wav', sub_filename).groups()
             filename_groups[speaker_id].append(filename)
         for speaker_id, filenames in filename_groups.items():
-            #if speaker_id not in accent2speaker['English']:
-            if speaker_id not in ['p226', 'p227', 'p228', 'p248', 'p251', 'p376']:
+            if speaker_id not in accent2speaker['English']:
                 continue
             print('processing {}'.format(speaker_id))
             train_size = int(len(filenames) * train_split)
