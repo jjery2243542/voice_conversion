@@ -71,7 +71,7 @@ def convert_mc(mc, c, solver, gen=True):
     converted_mc = converted_mc.squeeze(axis=0).transpose((1, 0))
     return converted_mc
 
-def get_model(hps_path='./hps/vcc.json', model_path='/storage/model/voice_conversion/vctk/clf/model.pkl-109999'):
+def get_model(hps_path='./hps/vctk.json', model_path='/storage/model/voice_conversion/vctk/clf/model.pkl-109999'):
     hps = Hps()
     hps.load(hps_path)
     hps_tuple = hps.get_tuple()
@@ -80,14 +80,14 @@ def get_model(hps_path='./hps/vcc.json', model_path='/storage/model/voice_conver
     return solver
 
 def convert_all_sp(h5_path, src_speaker, tar_speaker, gen=True, 
-        dset='test', speaker_used_path='./others/libri_train_eval/train_pairs.txt',
+        dset='test', speaker_used_path='/storage/feature/voice_conversion/vctk/dataset_used/en_speaker_used.txt',
         root_dir='/storage/result/voice_conversion/vctk/p226_to_p225/',
         model_path='/storage/model/voice_conversion/vctk/clf/wo_tanh/model_0.001.pkl-79999'):
     # read speaker id file
     with open(speaker_used_path) as f:
         speakers = [line.strip() for line in f]
         speaker2id = {speaker:i for i, speaker in enumerate(speakers)}
-    solver = get_model(hps_path='hps/ls.json', 
+    solver = get_model(hps_path='hps/vctk.json', 
             model_path=model_path)
     with h5py.File(h5_path, 'r') as f_h5:
         for utt_id in f_h5[f'{dset}/{src_speaker}']:
@@ -115,9 +115,9 @@ def convert_all_mc(h5_path, src_speaker, tar_speaker, gen=False,
             sf.write(wav_path, wav_data, 16000, 'PCM_24')
 
 if __name__ == '__main__':
-    #h5_path = '/storage/feature/voice_conversion/vctk/mcep/trim_mc_en_india_backup.h5'
-    root_dir = '/storage/result/voice_conversion/librispeech/'
-    h5_path = '/storage/feature/voice_conversion/LibriSpeech/libri.h5'
+    h5_path = '/storage/feature/voice_conversion/vctk/dataset_used/norm_vctk.h5'
+    root_dir = '/storage/result/voice_conversion/vctk/norm/clf_gen'
+    #h5_path = '/storage/feature/voice_conversion/LibriSpeech/libri.h5'
     #h5_path = '/storage/feature/voice_conversion/vctk/mcep/trim_mc_vctk_backup.h5'
     #convert_all_mc(h5_path, '226', '225', root_dir='./test_mc/', gen=False, 
     #        model_path='/storage/model/voice_conversion/vctk/mcep/clf/model.pkl-129999')
@@ -126,31 +126,31 @@ if __name__ == '__main__':
     #convert_all_mc(h5_path, '225', '228', root_dir='./test_mc/', gen=False, 
     #        model_path='/storage/model/voice_conversion/vctk/mcep/clf/model.pkl-129999')
     #model_path = '/storage/model/voice_conversion/vctk/mcep/clf/model.pkl-129999'
-    #model_path = '/storage/model/voice_conversion/vctk/clf/norm/wo_tanh/model_0.01.pkl-129999'
-    model_path = '/storage/model/voice_conversion/librispeech/ls_1e-3.pkl-99999'
-    #speakers = ['225', '226', '227', '228', '229', '230', '232', '243']
-    #for speaker_A in speakers:
-    #    for speaker_B in speakers:
-    #        if speaker_A == speaker_B:
-    #            continue
-    #        else:
-    #            dir_path = os.path.join(root_dir, f'p{speaker_A}_p{speaker_B}')
-    #            if not os.path.exists(dir_path):
-    #                os.makedirs(dir_path)
-    #            convert_all_sp(h5_path,speaker_A,speaker_B,
-    #                    root_dir=dir_path, 
-    #                    gen=True, model_path=model_path)
+    model_path = '/storage/model/voice_conversion/vctk/clf/norm/wo_tanh/model_0.001_no_ins.pkl-124000'
+    #model_path = '/storage/model/voice_conversion/librispeech/ls_1e-3.pkl-99999'
+    speakers = ['225', '226', '227']
+    for speaker_A in speakers:
+        for speaker_B in speakers:
+            if speaker_A == speaker_B:
+                continue
+            else:
+                dir_path = os.path.join(root_dir, f'p{speaker_A}_p{speaker_B}')
+                if not os.path.exists(dir_path):
+                    os.makedirs(dir_path)
+                convert_all_sp(h5_path,speaker_A,speaker_B,
+                        root_dir=dir_path, 
+                        gen=True, model_path=model_path)
     # diff accent
-    dir_path = os.path.join(root_dir, '163_6925')
-    if not os.path.exists(dir_path):
-        os.makedirs(dir_path)
-    convert_all_sp(h5_path,'163','6925',root_dir=dir_path, 
-            gen=False, model_path=model_path)
-    dir_path = os.path.join(root_dir, '460_1363')
-    if not os.path.exists(dir_path):
-        os.makedirs(dir_path)
-    convert_all_sp(h5_path,'460','1363',root_dir=dir_path, 
-            gen=False, model_path=model_path)
+    #dir_path = os.path.join(root_dir, '163_6925')
+    #if not os.path.exists(dir_path):
+    #    os.makedirs(dir_path)
+    #convert_all_sp(h5_path,'163','6925',root_dir=dir_path, 
+    #        gen=False, model_path=model_path)
+    #dir_path = os.path.join(root_dir, '460_1363')
+    #if not os.path.exists(dir_path):
+    #    os.makedirs(dir_path)
+    #convert_all_sp(h5_path,'460','1363',root_dir=dir_path, 
+    #        gen=False, model_path=model_path)
     #convert_all_sp(h5_path,'363','256',root_dir=os.path.join(root_dir, 'p363_p256'), 
     #        gen=True, model_path=model_path)
     #convert_all_sp(h5_path,'340','251',root_dir=os.path.join(root_dir, 'p340_p251'), 

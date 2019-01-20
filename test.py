@@ -22,7 +22,8 @@ if __name__ == '__main__':
     hps.load('./hps/vctk.json')
     hps_tuple = hps.get_tuple()
     solver = Solver(hps_tuple, None)
-    solver.load_model('/storage/model/voice_conversion/vctk/clf/norm/8_speakers_1e-3.pkl-149999')
+    #solver.load_model('/storage/model/voice_conversion/vctk/clf/norm/wo_tanh/8_speakers_1e-2.pkl-149999')
+    solver.load_model('/storage/model/voice_conversion/vctk/clf/norm/wo_tanh/model_0.001_no_ins.pkl-124000')
     if feature == 'mc':
         # indexer to extract data
         indexer = Indexer()
@@ -74,7 +75,7 @@ if __name__ == '__main__':
             wav_data = spectrogram2wav(result)
             write('result.wav', rate=16000, data=wav_data)
         else:
-            directory = './for_VC/hy/'
+            directory = './for_VC/phd_new/'
             for filename in glob.glob(os.path.join(directory, '*.wav')):
                 _, sub_filename = filename.rsplit('/', maxsplit=1)
                 _, spec = get_spectrograms(filename)
@@ -97,7 +98,7 @@ if __name__ == '__main__':
                     result = result.squeeze(axis=0).transpose((1, 0))
                     print(result.shape)
                     wav_data = spectrogram2wav(result)
-                write(os.path.join('./for_VC/hy/result/', sub_filename), rate=16000, data=wav_data)
+                write(os.path.join('./for_VC/phd_new/result/', sub_filename), rate=16000, data=wav_data)
         #result = solver.test_step(spec_tensor, c1, gen=True)
         #spec = np.loadtxt('preprocess/test_code/vcc/lin.npy')
         #spec2 = np.loadtxt('preprocess/test_code/vcc/lin2.npy')
