@@ -6,4 +6,10 @@ You can find the conversion sample at [here](https://jjery2243542.github.io/voic
 Pretrained model is available at [here](http://speech.ee.ntu.edu.tw/~jjery2243542/model.pkl).
 
 If you want to trained the model by yourself, please refer to new-branch, the hyperparameters are hps/vctk.json.
+#### training steps:
+- preprocess/make\_dataset\_vctk.py to generated the feature (you need to install h5py package).
+- preprocess/make\_single\_samples.py to generate the training segments and testing segments (need to change the variable in the code to switch to testing data).
+- train the model with main.py (hps/vctk.json).
+- generate the samples with convert.py.
+
 The source code is currently a little messy, if you have any problem, feel free to email me (jjery2243542@gmail.com).
