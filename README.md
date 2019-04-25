@@ -4,6 +4,7 @@ This is the source code for [Multi-target Voice Conversion without Parallel Data
 
 You can find the conversion sample at [here](https://jjery2243542.github.io/voice_conversion_demo/).
 Pretrained model is available at [here](http://speech.ee.ntu.edu.tw/~jjery2243542/model.pkl).
+Speaker list is available at[here](http://speech.ee.ntu.edu.tw/~jjery2243542/en_speaker_used.txt).
 
 If you want to trained the model by yourself, please refer to new-branch, the hyperparameters are hps/vctk.json.
 #### training steps:
