@@ -9,6 +9,7 @@ from scipy.io.wavfile import write
 import glob
 import os
 import argparse
+from solver import Solver
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
