@@ -4,7 +4,7 @@ You can find the demo webpage [here](https://jjery2243542.github.io/voice_conver
 
 # Dependency
 - python 3.6+
-- pytorch 0.4.0
+- pytorch 1.0.1
 - h5py 2.8
 - tensorboardX
 We also use some preprocess script from [Kyubyong/tacotron](https://github.com/Kyubyong/tacotron).
