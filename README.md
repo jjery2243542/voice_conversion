@@ -1,6 +1,6 @@
 # Multi-target Voice Conversion without Parallel Data by Adversarially Learning Disentangled Audio Representations
 This is the official implementation of the paper [Multi-target Voice Conversion without Parallel Data by Adversarially Learning Disentangled Audio Representations](https://arxiv.org/abs/1804.02812).
-You can find the demo webpage [here](https://jjery2243542.github.io/voice_conversion_demo/), and the pretrained model [here](http://speech.ee.ntu.edu.tw/~jjery2243542/model.pkl).
+You can find the demo webpage [here](https://jjery2243542.github.io/voice_conversion_demo/), and the pretrained model [here](http://speech.ee.ntu.edu.tw/~jjery2243542/resource/model/is18/model.pkl).
 
 # Dependency
 - python 3.6+
