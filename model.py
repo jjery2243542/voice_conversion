@@ -4,17 +4,6 @@ import torch.nn.functional as F
 import torch
 from torch.autograd import Variable
 
-class GradReverse(torch.autograd.Function):
-    @staticmethod
-    #def forward(ctx, x, _lambda=0.0001):
-    def forward(ctx, x):
-        #ctx._lambda = _lambda
-        return x.view_as(x)
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        return grad_output.neg()
-
 def pad_layer(inp, layer, is_2d=False):
     if type(layer.kernel_size) == tuple:
         kernel_size = layer.kernel_size[0]
@@ -50,39 +39,6 @@ def pixel_shuffle_1d(inp, upscale_factor=2):
 def upsample(x, scale_factor=2):
     x_up = F.upsample(x, scale_factor=2, mode='nearest')
     return x_up
-
-def GLU(inp, layer, res=True):
-    kernel_size = layer.kernel_size[0]
-    channels = layer.out_channels // 2
-    # padding
-    out = F.pad(inp.unsqueeze(dim=3), pad=(0, 0, kernel_size//2, kernel_size//2), mode='constant', value=0.)
-    out = out.squeeze(dim=3)
-    out = layer(out)
-    # gated
-    A = out[:, :channels, :]
-    B = F.sigmoid(out[:, channels:, :])
-    if res:
-        H = A * B + inp
-    else:
-        H = A * B
-    return H
-
-def highway(inp, layers, gates, act):
-    # permute
-    batch_size = inp.size(0)
-    seq_len = inp.size(2)
-    inp_permuted = inp.permute(0, 2, 1)
-    # merge dim
-    out_expand = inp_permuted.contiguous().view(batch_size*seq_len, inp_permuted.size(2))
-    for l, g in zip(layers, gates):
-        H = l(out_expand)
-        H = act(H)
-        T = g(out_expand)
-        T = F.sigmoid(T)
-        out_expand = H * T + out_expand * (1. - T)
-    out_permuted = out_expand.view(batch_size, seq_len, out_expand.size(1))
-    out = out_permuted.permute(0, 2, 1)
-    return out
 
 def RNN(inp, layer):
     inp_permuted = inp.permute(2, 0, 1)
@@ -163,38 +119,6 @@ class PatchDiscriminator(nn.Module):
         else:
             return mean_val
 
-class WeakSpeakerClassifier(nn.Module):
-    def __init__(self, c_in=512, c_h=512, n_class=8, dp=0.1, ns=0.01):
-        super(WeakSpeakerClassifier, self).__init__()
-        self.dp, self.ns = dp, ns
-        self.conv1 = nn.Conv1d(c_in, c_h, kernel_size=3)
-        self.conv2 = nn.Conv1d(c_h, c_h//2, kernel_size=3)
-        self.conv3 = nn.Conv1d(c_h//2, n_class, kernel_size=16)
-        self.drop1 = nn.Dropout(p=dp)
-        self.drop2 = nn.Dropout(p=dp)
-        self.ins_norm1 = nn.InstanceNorm1d(c_h)
-        self.ins_norm2 = nn.InstanceNorm1d(c_h//2)
-
-    def conv_block(self, x, conv_layers, after_layers, res=True):
-        out = x
-        for layer in conv_layers:
-            out = pad_layer(out, layer)
-            out = F.leaky_relu(out, negative_slope=self.ns)
-        for layer in after_layers:
-            out = layer(out)
-        if res:
-            out = out + x
-        return out
-
-    def forward(self, x, _lambda=0.0001, gr=False):
-        if gr:
-            x = GradReverse(_lambda=_lambda).apply(x)
-        out = self.conv_block(x, [self.conv1], [self.ins_norm1, self.drop1], res=False)
-        out = self.conv_block(out, [self.conv2], [self.ins_norm2, self.drop2], res=False)
-        out = self.conv3(out)
-        out = out.view(out.size()[0], -1)
-        return out
-
 class SpeakerClassifier(nn.Module):
     def __init__(self, c_in=512, c_h=512, n_class=8, dp=0.1, ns=0.01):
         super(SpeakerClassifier, self).__init__()
@@ -235,94 +159,6 @@ class SpeakerClassifier(nn.Module):
         out = self.conv_block(out, [self.conv7, self.conv8], [self.ins_norm4, self.drop4], res=False)
         out = self.conv9(out)
         out = out.view(out.size()[0], -1)
-        return out
-
-class LatentDiscriminator(nn.Module):
-    def __init__(self, c_in=1024, c_h=512, ns=0.2, dp=0.1):
-        super(LatentDiscriminator, self).__init__()
-        self.ns = ns
-        self.conv1 = nn.Conv1d(c_in, c_h, kernel_size=5)
-        self.conv2 = nn.Conv1d(c_h, c_h, kernel_size=5)
-        self.conv3 = nn.Conv1d(c_h, c_h, kernel_size=5)
-        self.conv4 = nn.Conv1d(c_h, c_h, kernel_size=5)
-        self.conv5 = nn.Conv1d(c_h, c_h, kernel_size=5)
-        self.conv6 = nn.Conv1d(c_h, c_h, kernel_size=5)
-        self.conv6 = nn.Conv1d(c_h, c_h, kernel_size=5)
-        self.conv7 = nn.Conv1d(c_h, c_h, kernel_size=5)
-        self.conv8 = nn.Conv1d(c_h, c_h, kernel_size=5)
-        self.conv9 = nn.Conv1d(c_h, 1, kernel_size=16)
-        self.drop1 = nn.Dropout(p=dp)
-        self.drop2 = nn.Dropout(p=dp)
-        self.drop3 = nn.Dropout(p=dp)
-        self.drop4 = nn.Dropout(p=dp)
-        self.ins_norm1 = nn.InstanceNorm1d(c_h)
-        self.ins_norm2 = nn.InstanceNorm1d(c_h)
-        self.ins_norm3 = nn.InstanceNorm1d(c_h)
-        self.ins_norm4 = nn.InstanceNorm1d(c_h)
-
-    def conv_block(self, x, conv_layers, after_layers, res=True):
-        out = x
-        for layer in conv_layers:
-            out = pad_layer(out, layer)
-            out = F.leaky_relu(out, negative_slope=self.ns)
-        for layer in after_layers:
-            out = layer(out)
-        if res:
-            out = out + x
-        return out
-
-    def forward(self, x):
-        out = self.conv_block(x, [self.conv1, self.conv2], [self.ins_norm1, self.drop1], res=False)
-        out = self.conv_block(out, [self.conv3, self.conv4], [self.ins_norm2, self.drop2], res=True)
-        out = self.conv_block(out, [self.conv5, self.conv6], [self.ins_norm3, self.drop3], res=True)
-        out = self.conv_block(out, [self.conv7, self.conv8], [self.ins_norm4, self.drop4], res=True)
-        out = self.conv9(out)
-        out = out.view(out.size()[0], -1)
-        mean_value = torch.mean(out, dim=1)
-        return mean_value
-
-class CBHG(nn.Module):
-    def __init__(self, c_in=80, c_out=513):
-        super(CBHG, self).__init__()
-        self.conv1s = nn.ModuleList(
-                [nn.Conv1d(c_in, 128, kernel_size=k) for k in range(1, 9)]
-                )
-        self.bn1s = nn.ModuleList([nn.BatchNorm1d(128) for _ in range(1, 9)])
-        self.mp1 = nn.MaxPool1d(kernel_size=2, stride=1)
-        self.conv2 = nn.Conv1d(len(self.conv1s)*128, 256, kernel_size=3, padding=1)
-        self.bn2 = nn.BatchNorm1d(256)
-        self.conv3 = nn.Conv1d(256, 80, kernel_size=3, padding=1)
-        self.bn3 = nn.BatchNorm1d(80)
-        # highway network
-        self.linear1 = nn.Linear(80, 128)
-        self.layers = nn.ModuleList([nn.Linear(128, 128) for _ in range(4)])
-        self.gates = nn.ModuleList([nn.Linear(128, 128) for _ in range(4)])
-        self.RNN = nn.GRU(input_size=128, hidden_size=128, num_layers=1, bidirectional=True)
-        self.linear2 = nn.Linear(256, c_out) 
-        
-    def forward(self, x):
-        outs = []
-        for l in self.conv1s:
-            out = pad_layer(x, l)
-            out = F.relu(out)
-            outs.append(out)
-        bn_outs = []
-        for out, bn in zip(outs, self.bn1s):
-           out = bn(out) 
-           bn_outs.append(out)
-        out = torch.cat(bn_outs, dim=1)
-        out = pad_layer(out, self.mp1)
-        out = self.conv2(out)
-        out = F.relu(out)
-        out = self.bn2(out)
-        out = self.conv3(out)
-        out = self.bn3(out)
-        out = out + x
-        out = linear(out, self.linear1)
-        out = highway(out, self.layers, self.gates, F.relu)
-        out_rnn = RNN(out, self.RNN)
-        out = linear(out_rnn, self.linear2)
-        out = F.sogmoid(out)
         return out
 
 class Decoder(nn.Module):
@@ -480,22 +316,3 @@ class Encoder(nn.Module):
         out = linear(out, self.linear)
         out = F.leaky_relu(out, negative_slope=self.ns)
         return out
-
-if __name__ == '__main__':
-    E1, E2 = Encoder().cuda(), Encoder().cuda()
-    D = Decoder().cuda()
-    C = LatentDiscriminator().cuda()
-    P = PatchDiscriminator().cuda()
-    S = SpeakerClassifier().cuda()
-    #cbhg = CBHG().cuda()
-    inp = Variable(torch.randn(16, 513, 128)).cuda()
-    e1 = E1(inp)
-    print(e1.size())
-    s1 = S(e1)
-    c = Variable(torch.from_numpy(np.random.randint(8, size=(16)))).cuda()
-    d = D(e1, c)
-    print(d.size())
-    p1, p2 = P(d, classify=True)
-    print(p1.size(), p2.size())
-    #c = C(torch.cat([e1, e1],dim=1))
-    #print(c.size())

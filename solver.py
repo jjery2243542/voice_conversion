@@ -5,27 +5,21 @@ from torch import nn
 import torch.nn.functional as F
 import numpy as np
 import pickle
-from utils import myDataset
 from model import Encoder
 from model import Decoder
 from model import SpeakerClassifier
-from model import WeakSpeakerClassifier
-#from model import LatentDiscriminator
 from model import PatchDiscriminator
-from model import CBHG
 import os
 from utils import Hps
 from utils import Logger
 from utils import DataLoader
 from utils import to_var
 from utils import reset_grad
-from utils import multiply_grad
 from utils import grad_clip
 from utils import cal_acc
 from utils import cc
 from utils import calculate_gradients_penalty
 from utils import gen_noise
-#from preprocess.tacotron import utils
 
 class Solver(object):
     def __init__(self, hps, data_loader, log_dir='./log/'):
@@ -334,11 +328,3 @@ class Solver(object):
                 if iteration % 1000 == 0 or iteration + 1 == hps.iters:
                     self.save_model(model_path, iteration)
 
-if __name__ == '__main__':
-    hps = Hps()
-    hps.load('./hps/v7.json')
-    hps_tuple = hps.get_tuple()
-    dataset = myDataset('/storage/raw_feature/voice_conversion/vctk/vctk.h5',\
-            '/storage/raw_feature/voice_conversion/vctk/64_513_2000k.json')
-    data_loader = DataLoader(dataset)
-    solver = Solver(hps_tuple, data_loader)

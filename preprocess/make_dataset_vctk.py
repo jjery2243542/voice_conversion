@@ -8,9 +8,6 @@ from collections import defaultdict
 #from tacotron.audio import load_wav, spectrogram, melspectrogram
 from tacotron.norm_utils import get_spectrograms 
 
-root_dir='/storage/datasets/VCTK/VCTK-Corpus/wav48'
-train_split=0.9
-
 def read_speaker_info(path='/storage/datasets/VCTK/VCTK-Corpus/speaker-info.txt'):
     accent2speaker = defaultdict(lambda: [])
     with open(path) as f:
@@ -23,14 +20,19 @@ def read_speaker_info(path='/storage/datasets/VCTK/VCTK-Corpus/speaker-info.txt'
 
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        print('usage: python3 make_dataset_vctk.py [h5py_path]')
+    if len(sys.argv) < 4:
+        print('usage: python3 make_dataset_vctk.py [data root directory (VCTK-Corpus)] [h5py path] '
+                '[training proportion]')
         exit(0)
-    accent2speaker = read_speaker_info()
-    h5py_path=sys.argv[1]
+
+    root_dir = sys.argv[1]
+    h5py_path = sys.argv[2]
+    proportion = float(sys.argv[3])
+
+    accent2speaker = read_speaker_info(os.path.join(root_dir, 'speaker-info.txt'))
     filename_groups = defaultdict(lambda : [])
     with h5py.File(h5py_path, 'w') as f_h5:
-        filenames = sorted(glob.glob(os.path.join(root_dir, '*/*.wav')))
+        filenames = sorted(glob.glob(os.path.join(root_dir, 'wav48/*/*.wav')))
         for filename in filenames:
             # divide into groups
             sub_filename = filename.strip().split('/')[-1]
@@ -38,26 +40,19 @@ if __name__ == '__main__':
             speaker_id, utt_id = re.match(r'p(\d+)_(\d+)\.wav', sub_filename).groups()
             filename_groups[speaker_id].append(filename)
         for speaker_id, filenames in filename_groups.items():
+            # only use the speakers who are English accent.
             if speaker_id not in accent2speaker['English']:
                 continue
             print('processing {}'.format(speaker_id))
-            train_size = int(len(filenames) * train_split)
+            train_size = int(len(filenames) * proportion)
             for i, filename in enumerate(filenames):
-                print(filename)
                 sub_filename = filename.strip().split('/')[-1]
                 # format: p{speaker}_{sid}.wav
                 speaker_id, utt_id = re.match(r'p(\d+)_(\d+)\.wav', sub_filename).groups()
-                #wav_data = load_wav(filename)
-                #lin_spec = spectrogram(wav_data).astype(np.float32).T
-                #mel_spec = melspectrogram(wav_data).astype(np.float32).T
-                mel_spec, lin_spec = get_spectrograms(filename)
-                #eps = 1e-10
-                #log_mel_spec, log_lin_spec = np.log(mel_spec+eps), np.log(lin_spec+eps)
+                _, lin_spec = get_spectrograms(filename)
                 if i < train_size:
                     datatype = 'train'
                 else:
                     datatype = 'test'
-                f_h5.create_dataset(f'{datatype}/{speaker_id}/{utt_id}/mel', \
-                    data=mel_spec, dtype=np.float32)
-                f_h5.create_dataset(f'{datatype}/{speaker_id}/{utt_id}/lin', \
+                f_h5.create_dataset(f'{datatype}/{speaker_id}/{utt_id}', \
                     data=lin_spec, dtype=np.float32)
