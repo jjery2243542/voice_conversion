@@ -118,7 +118,26 @@ class Solver(object):
         x_tilde = self.Decoder(enc, c)
         return x_tilde
 
+<<<<<<< HEAD
     def patch_step(self, x, x_tilde, is_dis=True):
+=======
+    def latent_discriminate_step(self, enc_i_t, enc_i_tk, enc_i_prime, enc_j, is_dis=True):
+        same_pair = torch.cat([enc_i_t, enc_i_tk], dim=1)
+        diff_pair = torch.cat([enc_i_prime, enc_j], dim=1)
+        if is_dis:
+            same_val = self.LatentDiscriminator(same_pair)
+            diff_val = self.LatentDiscriminator(diff_pair)
+            w_dis = torch.mean(same_val - diff_val)
+            gp = calculate_gradients_penalty(self.LatentDiscriminator, same_pair, diff_pair)
+            return w_dis, gp
+        else:
+            diff_val = self.LatentDiscriminator(diff_pair)
+            loss_adv = -torch.mean(diff_val)
+            return loss_adv
+
+    def patch_discriminate_step(self, x, x_tilde, cal_gp=True):
+        # w-distance
+>>>>>>> 4b2f701ba47b7c326213842f90ded5a8f429ec15
         D_real, real_logits = self.PatchDiscriminator(x, classify=True)
         D_fake, fake_logits = self.PatchDiscriminator(x_tilde, classify=True)
         if is_dis:
@@ -258,6 +277,7 @@ class Solver(object):
                 print(log % slot_value)
                 if iteration % 100 == 0:
                     for tag, value in info.items():
+<<<<<<< HEAD
                         self.logger.scalar_summary(tag, value, iteration + 1)
                 if iteration % 1000 == 0 or iteration + 1 == hps.patch_iters:
                     self.save_model(model_path, iteration + hps.iters)
@@ -313,6 +333,47 @@ class Solver(object):
                 loss.backward()
                 grad_clip([self.Encoder, self.Decoder], self.hps.max_grad_norm)
                 self.ae_opt.step()
+=======
+                        self.logger.scalar_summary(tag, value, iteration)
+            #===================== Train G =====================#
+            data = next(self.data_loader)
+            (c_i, c_j), (x_i_t, x_i_tk, x_i_prime, x_j) = self.permute_data(data)
+            # encode
+            enc_i_t, enc_i_tk, enc_i_prime, enc_j = self.encode_step(x_i_t, x_i_tk, x_i_prime, x_j)
+            # decode
+            x_tilde = self.decode_step(enc_i_t, c_i)
+            loss_rec = torch.mean(torch.abs(x_tilde - x_i_t))
+            # latent discriminate
+            loss_adv = self.latent_discriminate_step(
+                    enc_i_t, enc_i_tk, enc_i_prime, enc_j, is_dis=False)
+            ae_loss = loss_rec + current_alpha * loss_adv
+            reset_grad([self.Encoder, self.Decoder])
+            retain_graph = True if hps.n_patch_steps > 0 else False
+            ae_loss.backward(retain_graph=retain_graph)
+            grad_clip([self.Encoder, self.Decoder], self.hps.max_grad_norm)
+            self.ae_opt.step()
+            info = {
+                f'{flag}/loss_rec': loss_rec.data[0],
+                f'{flag}/loss_adv': loss_adv.data[0],
+                f'{flag}/alpha': current_alpha,
+            }
+            slot_value = (iteration+1, hps.iters) + tuple([value for value in info.values()])
+            log = 'G:[%06d/%06d], loss_rec=%.2f, loss_adv=%.2f, alpha=%.2e'
+            print(log % slot_value)
+            for tag, value in info.items():
+                self.logger.scalar_summary(tag, value, iteration + 1)
+            # patch discriminate
+            if hps.n_patch_steps > 0 and iteration >= hps.patch_start_iter:
+                c_sample = self.sample_c(x_i_t.size(0))
+                x_tilde = self.decode_step(enc_i_t, c_sample)
+                patch_w_dis, real_logits, fake_logits = \
+                        self.patch_discriminate_step(x_i_t, x_tilde, cal_gp=False)
+                patch_loss = hps.beta_dec * patch_w_dis + hps.beta_clf * c_loss
+                reset_grad([self.Decoder])
+                patch_loss.backward()
+                grad_clip([self.Decoder], self.hps.max_grad_norm)
+                self.decoder_opt.step()
+>>>>>>> 4b2f701ba47b7c326213842f90ded5a8f429ec15
                 info = {
                     f'{flag}/loss_rec': loss_rec.item(),
                     f'{flag}/G_loss_clf': loss_clf.item(),
