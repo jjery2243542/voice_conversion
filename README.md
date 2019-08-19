@@ -12,7 +12,7 @@ We also use some preprocess script from [Kyubyong/tacotron](https://github.com/K
 # Preprocess
 Our model is trained on [CSTR VCTK Corpus](https://homepages.inf.ed.ac.uk/jyamagis/page3/page58/page58.html).
 
-#### Feature extraction
+### Feature extraction
 We use the code from [Kyubyong/tacotron](https://github.com/Kyubyong/tacotron) to extract feature. The default paprameters can be found at ```preprocess/tacotron/norm_utils.py```.
 
 The configuration for preprocess is at ```preprocess/vctk.config```, where: 
