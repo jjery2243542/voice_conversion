@@ -37,7 +37,7 @@ if __name__ == '__main__':
             # divide into groups
             sub_filename = filename.strip().split('/')[-1]
             # format: p{speaker}_{sid}.wav
-            speaker_id, utt_id = re.match(r'p(\d+)_(\d+)\.wav', sub_filename).groups()
+            speaker_id, utt_id = re.search(r'p(\d+)_(\d+)\.wav', sub_filename).groups()
             filename_groups[speaker_id].append(filename)
         for speaker_id, filenames in filename_groups.items():
             # only use the speakers who are English accent.
@@ -48,7 +48,7 @@ if __name__ == '__main__':
             for i, filename in enumerate(filenames):
                 sub_filename = filename.strip().split('/')[-1]
                 # format: p{speaker}_{sid}.wav
-                speaker_id, utt_id = re.match(r'p(\d+)_(\d+)\.wav', sub_filename).groups()
+                speaker_id, utt_id = re.search(r'p(\d+)_(\d+)\.wav', sub_filename).groups()
                 _, lin_spec = get_spectrograms(filename)
                 if i < train_size:
                     datatype = 'train'
